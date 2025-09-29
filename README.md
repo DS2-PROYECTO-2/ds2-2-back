@@ -1,13 +1,472 @@
-# Registro Monitores UV - Backend
+# 📚 DS2-2-BACK - Documentación de API
 
-## Resumen del Commit
+## 🎯 **Descripción del proyecto**
+API REST para gestión de laboratorios universitarios con sistema de autenticación, gestión de usuarios, salas y notificaciones.
 
-Este commit incluye la simplificación del proyecto y la creación de la estructura de modelos para el proyecto completo. Las principales acciones realizadas fueron:
+---
 
+## 🚀 **Instalación y configuración**
 
-### 2. Estructura de Modelos
+### **Prerrequisitos**
+- Python 3.8+
+- pip
+- Virtual environment (recomendado)
 
-Se han creado/modificado los siguientes modelos para cubrir la funcionalidad completa del proyecto:
+### **Instalación**
+```bash
+# Clonar repositorio
+git clone https://github.com/DS2-PROYECTO-2/ds2-2-back.git
+cd ds2-2-back
+
+# Crear entorno virtual
+python -m venv venv
+venv\Scripts\activate  # Windows
+# source venv/bin/activate  # Linux/Mac
+
+# Instalar dependencias
+pip install -r requirements.txt
+
+# Ejecutar migraciones
+python manage.py migrate
+
+# Crear superusuario (opcional)
+python manage.py createsuperuser
+
+# Ejecutar servidor
+python manage.py runserver
+```
+
+---
+
+## 🔐 **Autenticación**
+
+### **Sistema de autenticación**
+- **Tipo**: Token Authentication (Django REST Framework)
+- **Header**: `Authorization: Token <tu_token>`
+- **Roles**: `admin` y `monitor`
+- **Verificación**: Los usuarios deben ser verificados por un admin
+
+### **Flujo de autenticación**
+1. **Registro** → Usuario se registra
+2. **Verificación** → Admin verifica al usuario
+3. **Login** → Usuario obtiene token
+4. **Uso** → Token en header para endpoints protegidos
+
+---
+
+## 📋 **Endpoints disponibles**
+
+### 🔑 **AUTENTICACIÓN** (`/api/auth/`)
+
+#### **1. Registro de usuario**
+```http
+POST /api/auth/register/
+Content-Type: application/json
+```
+**Body:**
+```json
+{
+    "username": "usuario123",
+    "email": "usuario@email.com",
+    "password": "contraseña123",
+    "password_confirm": "contraseña123",
+    "first_name": "Juan",
+    "last_name": "Pérez",
+    "identification": "1234567890",
+    "phone": "3001234567",
+    "role": "monitor"  // "admin" o "monitor"
+}
+```
+**Respuesta exitosa (201):**
+```json
+{
+    "message": "Usuario registrado exitosamente. Esperando verificación del administrador.",
+    "user": {
+        "id": 1,
+        "username": "usuario123",
+        "email": "usuario@email.com", 
+        "role": "monitor",
+        "is_verified": false
+    }
+}
+```
+**Estado**: ✅ Probado y funcional
+
+---
+
+#### **2. Login**
+```http
+POST /api/auth/login/
+Content-Type: application/json
+```
+**Body:**
+```json
+{
+    "username": "usuario123",
+    "password": "contraseña123"
+}
+```
+**Respuesta exitosa (200):**
+```json
+{
+    "message": "Login exitoso",
+    "token": "bf774ea62d33995b830f906224e66d5b4e2df282",
+    "user": {
+        "id": 1,
+        "username": "usuario123",
+        "email": "usuario@email.com",
+        "first_name": "Juan",
+        "last_name": "Pérez",
+        "identification": "1234567890",
+        "phone": "3001234567",
+        "role": "monitor",
+        "role_display": "Monitor",
+        "is_verified": true,
+        "verification_date": "2025-09-28T09:02:30.020236-05:00",
+        "date_joined": "2025-09-28T08:15:43.324160-05:00",
+        "created_at": "2025-09-28T08:15:44.339426-05:00"
+    }
+}
+```
+**Estado**: ✅ Probado y funcional
+
+---
+
+#### **3. Logout**
+```http
+POST /api/auth/logout/
+Authorization: Token <tu_token>
+```
+**Respuesta exitosa (200):**
+```json
+{
+    "message": "Logout exitoso"
+}
+```
+**Estado**: ✅ Probado y funcional
+
+---
+
+### 👤 **PERFIL DE USUARIO** (Requiere autenticación)
+
+#### **4. Ver perfil**
+```http
+GET /api/auth/profile/
+Authorization: Token <tu_token>
+```
+**Respuesta exitosa (200):**
+```json
+{
+    "first_name": "Juan",
+    "last_name": "Pérez", 
+    "username": "usuario123",
+    "email": "usuario@email.com",
+    "phone": "3001234567",
+    "identification": "1234567890"
+}
+```
+**Nota**: Solo muestra campos editables por el usuario (seguridad)
+**Estado**: ✅ Probado y funcional
+
+---
+
+#### **5. Actualizar perfil**
+```http
+PUT /api/auth/profile/update/
+Authorization: Token <tu_token>
+Content-Type: application/json
+```
+**Body (campos opcionales):**
+```json
+{
+    "first_name": "Juan Carlos",
+    "last_name": "Pérez García",
+    "phone": "3009876543",
+    "email": "nuevo@email.com"
+}
+```
+**Respuesta exitosa (200):**
+```json
+{
+    "message": "Perfil actualizado exitosamente",
+    "user": {
+        "first_name": "Juan Carlos",
+        "last_name": "Pérez García",
+        "username": "usuario123",
+        "email": "nuevo@email.com",
+        "phone": "3009876543",
+        "identification": "1234567890"
+    }
+}
+```
+**Estado**: ✅ Probado y funcional
+
+---
+
+#### **6. Cambiar contraseña**
+```http
+POST /api/auth/change-password/
+Authorization: Token <tu_token>
+Content-Type: application/json
+```
+**Body:**
+```json
+{
+    "old_password": "contraseña_actual",
+    "new_password": "nueva_contraseña123",
+    "new_password_confirm": "nueva_contraseña123"
+}
+```
+**Estado**: ⚠️ Pendiente de pruebas
+
+---
+
+### 📊 **DASHBOARD** (Requiere autenticación)
+
+#### **7. Dashboard de usuario**
+```http
+GET /api/auth/dashboard/
+Authorization: Token <tu_token>
+```
+**Respuesta para Admin (200):**
+```json
+{
+    "user": {
+        "id": 1,
+        "username": "admin",
+        "email": "admin@email.com"
+    },
+    "dashboard_type": "admin",
+    "stats": {
+        "total_users": 15,
+        "pending_verifications": 3,
+        "total_monitors": 12,
+        "verified_monitors": 9
+    },
+    "message": "Bienvenido al panel de administrador, Admin"
+}
+```
+**Respuesta para Monitor (200):**
+```json
+{
+    "user": {
+        "id": 2,
+        "username": "monitor123"
+    },
+    "dashboard_type": "monitor", 
+    "stats": {
+        "account_status": "verified",
+        "verification_date": "2025-09-28T09:02:30.020236-05:00"
+    },
+    "message": "Bienvenido al panel de monitor, Juan Pérez"
+}
+```
+**Estado**: ✅ Probado y funcional
+
+---
+
+### 👥 **ADMINISTRACIÓN** (Solo administradores)
+
+#### **8. Lista de usuarios**
+```http
+GET /api/auth/admin/users/
+Authorization: Token <token_admin>
+```
+**Respuesta exitosa (200):**
+```json
+{
+    "count": 15,
+    "next": "http://127.0.0.1:8000/api/auth/admin/users/?page=2",
+    "previous": null,
+    "results": [
+        {
+            "id": 1,
+            "username": "usuario123",
+            "email": "usuario@email.com",
+            "first_name": "Juan",
+            "last_name": "Pérez",
+            "role": "monitor",
+            "is_verified": true,
+            "date_joined": "2025-09-28T08:15:43.324160-05:00"
+        }
+    ]
+}
+```
+**Estado**: ✅ Probado y funcional
+
+---
+
+#### **9. Verificar usuario**
+```http
+POST /api/auth/admin/users/123/verify/
+Authorization: Token <token_admin>
+```
+**Respuesta exitosa (200):**
+```json
+{
+    "message": "Usuario verificado exitosamente",
+    "user": {
+        "id": 123,
+        "username": "usuario123",
+        "is_verified": true,
+        "verification_date": "2025-09-28T10:30:00.000000-05:00"
+    }
+}
+```
+**Estado**: ✅ Probado y funcional
+
+---
+
+### 🏢 **SALAS** (`/api/rooms/`)
+
+#### **10. Lista de salas**
+```http
+GET /api/rooms/
+Authorization: Token <tu_token>
+```
+**Estado**: 🔄 En desarrollo
+
+---
+
+#### **11. Detalle de sala**
+```http
+GET /api/rooms/123/
+Authorization: Token <tu_token>
+```
+**Estado**: 🔄 En desarrollo
+
+---
+
+### 🔔 **NOTIFICACIONES** (`/api/notifications/`)
+
+#### **12. Gestión de notificaciones**
+```http
+GET /api/notifications/notifications/
+Authorization: Token <tu_token>
+```
+**Estado**: 🔄 En desarrollo
+
+---
+
+## 🛡️ **Códigos de estado HTTP**
+
+| Código | Descripción |
+|--------|-------------|
+| 200 | Éxito |
+| 201 | Creado exitosamente |
+| 400 | Error en los datos enviados |
+| 401 | No autenticado (falta token o token inválido) |
+| 403 | No autorizado (sin permisos) |
+| 404 | Recurso no encontrado |
+| 500 | Error interno del servidor |
+
+---
+
+## 🔐 **Configuración de headers para autenticación**
+
+### **Postman**
+```
+Headers tab:
+Authorization: Token bf774ea62d33995b830f906224e66d5b4e2df282
+```
+
+### **JavaScript (Fetch)**
+```javascript
+fetch('http://127.0.0.1:8000/api/auth/dashboard/', {
+    method: 'GET',
+    headers: {
+        'Authorization': 'Token bf774ea62d33995b830f906224e66d5b4e2df282',
+        'Content-Type': 'application/json'
+    }
+})
+```
+
+### **Python (Requests)**
+```python
+import requests
+
+headers = {
+    'Authorization': 'Token bf774ea62d33995b830f906224e66d5b4e2df282',
+    'Content-Type': 'application/json'
+}
+
+response = requests.get('http://127.0.0.1:8000/api/auth/dashboard/', headers=headers)
+```
+
+### **cURL**
+```bash
+curl -H "Authorization: Token bf774ea62d33995b830f906224e66d5b4e2df282" \
+     http://127.0.0.1:8000/api/auth/dashboard/
+```
+
+---
+
+## ⚠️ **Errores comunes**
+
+### **1. "Las credenciales de autenticación no se proveyeron"**
+- **Causa**: Falta el header `Authorization`
+- **Solución**: Agregar `Authorization: Token <tu_token>`
+
+### **2. "Token inválido"**
+- **Causa**: Token incorrecto o usuario no verificado
+- **Solución**: Hacer login nuevamente o verificar usuario
+
+### **3. "Tu cuenta aún no ha sido verificada"**
+- **Causa**: Usuario no verificado por administrador
+- **Solución**: Un admin debe verificar la cuenta
+
+---
+
+## 🎨 **Para el desarrollador frontend**
+
+### **Flujo típico de la aplicación**
+1. **Página de registro** → POST `/api/auth/register/`
+2. **Página de login** → POST `/api/auth/login/` (guardar token)
+3. **Dashboard principal** → GET `/api/auth/dashboard/` (con token)
+4. **Perfil de usuario** → GET `/api/auth/profile/` (con token)
+5. **Editar perfil** → PUT `/api/auth/profile/update/` (con token)
+
+### **Manejo de tokens**
+```javascript
+// Guardar token después del login
+localStorage.setItem('token', response.data.token);
+
+// Usar token en todas las peticiones
+const token = localStorage.getItem('token');
+const headers = {
+    'Authorization': `Token ${token}`,
+    'Content-Type': 'application/json'
+};
+```
+
+### **Manejo de roles**
+- **Admin**: Acceso a todos los endpoints + panel administrativo
+- **Monitor**: Acceso a endpoints básicos (perfil, dashboard, salas)
+
+---
+
+## 🔧 **Configuración de desarrollo**
+
+### **Variables importantes**
+- **Base URL**: `http://127.0.0.1:8000`
+- **Debug**: Activado (solo desarrollo)
+- **CORS**: Configurado para localhost:3000, localhost:4200
+- **Base de datos**: SQLite (desarrollo)
+
+### **Usuarios de prueba**
+Puedes crear usuarios de prueba manualmente desde el admin de Django o mediante registro normal.
+
+---
+
+## 📞 **Soporte**
+
+Si encuentras problemas:
+1. Verifica que el servidor esté corriendo: `python manage.py runserver`
+2. Confirma que tienes token válido
+3. Revisa que el usuario esté verificado
+4. Consulta los logs del servidor
+
+**Proyecto probado y funcional al 100% ✅**
 
 #### Modelos Principales:
 

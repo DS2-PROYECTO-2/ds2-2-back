@@ -1,42 +1,34 @@
-from rest_framework import viewsets, permissions
-from .models import Room, RoomEntry
-from .serializers import RoomSerializer, RoomEntrySerializer
-from users.views import IsAdminUser
+from rest_framework import permissions
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.response import Response
+from rest_framework import status
+from .models import Room
+from .serializers import RoomSerializer
+from users.permissions import IsVerifiedUser
 
 
-class RoomViewSet(viewsets.ModelViewSet):
+@api_view(['GET'])
+@permission_classes([permissions.AllowAny])
+def room_list_view(request):
     """
-    API endpoint para gestionar salas
+    Vista para listar todas las salas activas
     """
-    queryset = Room.objects.all()
-    serializer_class = RoomSerializer
-    
-    def get_permissions(self):
-        """
-        Define permisos según la acción
-        """
-        if self.action in ['create', 'update', 'partial_update', 'destroy']:
-            permission_classes = [IsAdminUser]
-        else:
-            permission_classes = [permissions.IsAuthenticated]
-        
-        return [permission() for permission in permission_classes]
-    
-    # Agregar métodos personalizados según necesidades
+    rooms = Room.objects.filter(is_active=True).order_by('code')
+    serializer = RoomSerializer(rooms, many=True)
+    return Response(serializer.data, status=status.HTTP_200_OK)
 
 
-class RoomEntryViewSet(viewsets.ModelViewSet):
+@api_view(['GET'])
+@permission_classes([permissions.AllowAny])
+def room_detail_view(request, room_id):
     """
-    API endpoint para gestionar entradas y salidas de salas
+    Vista para obtener detalles de una sala específica
     """
-    queryset = RoomEntry.objects.all().order_by('-entry_time')
-    serializer_class = RoomEntrySerializer
-    
-    def get_permissions(self):
-        """
-        Define permisos según la acción
-        """
-        # Implementar lógica de permisos según necesidades
-        return [permissions.IsAuthenticated()]
-    
-    # Agregar métodos para registrar salidas, verificar entradas activas, etc.
+    try:
+        room = Room.objects.get(id=room_id, is_active=True)
+        serializer = RoomSerializer(room)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    except Room.DoesNotExist:
+        return Response({
+            'error': 'Sala no encontrada'
+        }, status=status.HTTP_404_NOT_FOUND)

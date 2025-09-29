@@ -1,26 +1,202 @@
 from rest_framework import serializers
+from django.contrib.auth import authenticate
+from django.utils import timezone
 from .models import User
 
 
-class UserSerializer(serializers.ModelSerializer):
+class UserRegistrationSerializer(serializers.ModelSerializer):
     """
-    Serializer básico para el modelo User
+    Serializador para el registro de nuevos usuarios
+    """
+    password = serializers.CharField(write_only=True, min_length=8)
+    password_confirm = serializers.CharField(write_only=True)
+
+    class Meta:
+        model = User
+        fields = [
+            'username', 'email', 'password', 'password_confirm',
+            'first_name', 'last_name', 'identification', 'phone', 'role'
+        ]
+        extra_kwargs = {
+            'email': {'required': True},
+            'identification': {'required': True},
+            'first_name': {'required': True},
+            'last_name': {'required': True},
+        }
+
+    def validate(self, attrs):
+        if attrs['password'] != attrs['password_confirm']:
+            raise serializers.ValidationError("Las contraseñas no coinciden")
+        
+        # Validar que la identificación no exista
+        if User.objects.filter(identification=attrs['identification']).exists():
+            raise serializers.ValidationError("Ya existe un usuario con esta identificación")
+        
+        return attrs
+
+    def create(self, validated_data):
+        validated_data.pop('password_confirm')
+        password = validated_data.pop('password')
+        
+        user = User.objects.create_user(
+            password=password,
+            **validated_data
+        )
+        return user
+
+
+class UserLoginSerializer(serializers.Serializer):
+    """
+    Serializador para el login de usuarios
+    """
+    username = serializers.CharField()
+    password = serializers.CharField(write_only=True)
+
+    def validate(self, attrs):
+        username = attrs.get('username')
+        password = attrs.get('password')
+
+        if username and password:
+            user = authenticate(username=username, password=password)
+            
+            if not user:
+                raise serializers.ValidationError('Credenciales inválidas')
+            
+            if not user.is_active:
+                raise serializers.ValidationError('Cuenta desactivada')
+            
+            if not user.is_verified and user.role == 'monitor':
+                raise serializers.ValidationError('Tu cuenta aún no ha sido verificada por un administrador')
+            
+            attrs['user'] = user
+            return attrs
+        else:
+            raise serializers.ValidationError('Debe incluir username y password')
+
+
+class UserProfileSerializer(serializers.ModelSerializer):
+    """
+    Serializador para el perfil del usuario - Solo campos que el usuario puede ver/editar
     """
     class Meta:
         model = User
-        fields = ['id', 'username', 'email', 'first_name', 'last_name', 
-                  'role', 'document_id', 'phone_number', 'is_active']
-        read_only_fields = ['id', 'is_active']
+        fields = [
+            'first_name', 'last_name', 'username', 'email', 'phone', 'identification'
+        ]
+        
+    def validate_identification(self, value):
+        """
+        Validar que la identificación no esté en uso por otro usuario
+        """
+        if self.instance and self.instance.identification == value:
+            return value  # No cambió, es válido
+            
+        if User.objects.filter(identification=value).exists():
+            raise serializers.ValidationError("Ya existe un usuario con esta identificación")
+        return value
+        
+    def validate_username(self, value):
+        """
+        Validar que el username no esté en uso por otro usuario
+        """
+        if self.instance and self.instance.username == value:
+            return value  # No cambió, es válido
+            
+        if User.objects.filter(username=value).exists():
+            raise serializers.ValidationError("Ya existe un usuario con este nombre de usuario")
+        return value
+        
+    def validate_email(self, value):
+        """
+        Validar que el email no esté en uso por otro usuario
+        """
+        if self.instance and self.instance.email == value:
+            return value  # No cambió, es válido
+            
+        if User.objects.filter(email=value).exists():
+            raise serializers.ValidationError("Ya existe un usuario con este email")
+        return value
 
 
-class UserCreateSerializer(serializers.ModelSerializer):
+class UserProfileCompleteSerializer(serializers.ModelSerializer):
     """
-    Serializer para la creación de usuarios
+    Serializador completo del usuario para uso interno (dashboard, admin, etc.)
     """
-    password = serializers.CharField(write_only=True, required=True)
-    password_confirm = serializers.CharField(write_only=True, required=True)
-    
+    role_display = serializers.CharField(source='get_role_display', read_only=True)
+    verified_by_name = serializers.CharField(source='verified_by.get_full_name', read_only=True)
+
     class Meta:
         model = User
-        fields = ['username', 'password', 'password_confirm', 'email', 'first_name', 
-                  'last_name', 'role', 'document_id', 'phone_number']
+        fields = [
+            'id', 'username', 'email', 'first_name', 'last_name',
+            'identification', 'phone', 'role', 'role_display',
+            'is_verified', 'verified_by_name', 'verification_date',
+            'date_joined', 'created_at'
+        ]
+        read_only_fields = [
+            'id', 'is_verified', 'verified_by_name', 'verification_date',
+            'date_joined', 'created_at'
+        ]
+
+
+class AdminUserListSerializer(serializers.ModelSerializer):
+    """
+    Serializador para la lista de usuarios (vista de administrador)
+    """
+    role_display = serializers.CharField(source='get_role_display', read_only=True)
+    full_name = serializers.CharField(source='get_full_name', read_only=True)
+
+    class Meta:
+        model = User
+        fields = [
+            'id', 'username', 'email', 'full_name', 'identification',
+            'phone', 'role', 'role_display', 'is_verified', 'is_active',
+            'date_joined', 'created_at'
+        ]
+
+
+class AdminUserVerificationSerializer(serializers.ModelSerializer):
+    """
+    Serializador para que los administradores verifiquen usuarios
+    """
+    class Meta:
+        model = User
+        fields = ['is_verified']
+
+    def update(self, instance, validated_data):
+        if validated_data.get('is_verified'):
+            instance.is_verified = True
+            instance.verified_by = self.context['request'].user
+            instance.verification_date = timezone.now()
+        else:
+            instance.is_verified = False
+            instance.verified_by = None
+            instance.verification_date = None
+        
+        instance.save()
+        return instance
+
+
+class ChangePasswordSerializer(serializers.Serializer):
+    """
+    Serializador para cambio de contraseña
+    """
+    old_password = serializers.CharField(required=True)
+    new_password = serializers.CharField(required=True, min_length=8)
+    new_password_confirm = serializers.CharField(required=True)
+
+    def validate(self, attrs):
+        if attrs['new_password'] != attrs['new_password_confirm']:
+            raise serializers.ValidationError("Las nuevas contraseñas no coinciden")
+        
+        user = self.context['request'].user
+        if not user.check_password(attrs['old_password']):
+            raise serializers.ValidationError("La contraseña actual es incorrecta")
+        
+        return attrs
+
+    def save(self):
+        user = self.context['request'].user
+        user.set_password(self.validated_data['new_password'])
+        user.save()
+        return user

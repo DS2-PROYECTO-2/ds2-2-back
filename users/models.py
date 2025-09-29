@@ -1,5 +1,6 @@
 from django.db import models
 from django.contrib.auth.models import AbstractUser
+from .managers import CustomUserManager
 
 
 class User(AbstractUser):
@@ -35,17 +36,39 @@ class User(AbstractUser):
     )
     is_verified = models.BooleanField(
         default=False,
+        verbose_name="Verificado",
         help_text='Indica si el usuario ha sido verificado por un administrador'
+    )
+    verified_by = models.ForeignKey(
+        'self',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='verified_users',
+        verbose_name="Verificado por",
+        help_text='Administrador que verificó al usuario'
+    )
+    verification_date = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name="Fecha de verificación",
+        help_text='Fecha y hora en que fue verificado el usuario'
     )
     
     # Campos de auditoría
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    objects = CustomUserManager()
+
+    REQUIRED_FIELDS = ['email', 'identification']
+    USERNAME_FIELD = 'username'
+
     class Meta:
         verbose_name = 'Usuario'
         verbose_name_plural = 'Usuarios'
         ordering = ['username']
+        db_table = "users_user"
     
     def __str__(self):
         return f"{self.get_full_name()} ({self.get_role_display()})"

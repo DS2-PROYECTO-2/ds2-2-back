@@ -8,10 +8,11 @@ class NotificationViewSet(viewsets.ModelViewSet):
     API endpoint para gestionar notificaciones
     """
     serializer_class = NotificationSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.AllowAny]
     
     def get_queryset(self):
         """
-        Retorna solo las notificaciones del usuario autenticado
+        Retorna todas las notificaciones para desarrollo
         """
-        return Notification.objects.filter(user=self.request.user).order_by('-created_at')
+        # Para desarrollo: mostrar todas las notificaciones
+        return Notification.objects.all().order_by('-created_at')

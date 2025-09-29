@@ -1,11 +1,8 @@
-from django.urls import path, include
-from rest_framework.routers import DefaultRouter
+from django.urls import path
 from . import views
 
-router = DefaultRouter()
-router.register(r'rooms', views.RoomViewSet)
-router.register(r'entries', views.RoomEntryViewSet)
-
 urlpatterns = [
-    path('', include(router.urls)),
+    # Gestión de salas (Sprint 1)
+    path('', views.room_list_view, name='room_list'),
+    path('<int:room_id>/', views.room_detail_view, name='room_detail'),
 ]
