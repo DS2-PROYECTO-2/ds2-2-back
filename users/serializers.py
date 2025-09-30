@@ -57,22 +57,36 @@ class UserLoginSerializer(serializers.Serializer):
         password = attrs.get('password')
 
         if username and password:
-            user = authenticate(username=username, password=password)
+            # Verificar si el usuario existe
+            try:
+                user = User.objects.get(username=username)
+            except User.DoesNotExist:
+                raise serializers.ValidationError({
+                    'username': ['Usuario no encontrado']
+                })
             
-            if not user:
-                raise serializers.ValidationError('Credenciales inválidas')
-            
+            # Verificar si la cuenta está activa
             if not user.is_active:
-                raise serializers.ValidationError('Cuenta desactivada')
+                raise serializers.ValidationError({
+                    'username': ['Cuenta desactivada']
+                })
             
+            # Verificar contraseña
+            if not user.check_password(password):
+                raise serializers.ValidationError({
+                    'password': ['Contraseña incorrecta']
+                })
+            
+            # Verificar verificación para monitores
             if not user.is_verified and user.role == 'monitor':
-                raise serializers.ValidationError('Tu cuenta aún no ha sido verificada por un administrador')
+                raise serializers.ValidationError({
+                    'username': ['Tu cuenta aún no ha sido verificada por un administrador']
+                })
             
             attrs['user'] = user
             return attrs
         else:
             raise serializers.ValidationError('Debe incluir username y password')
-
 
 class UserProfileSerializer(serializers.ModelSerializer):
     """
