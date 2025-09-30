@@ -30,5 +30,9 @@ def room_detail_view(request, room_id):
         return Response(serializer.data, status=status.HTTP_200_OK)
     except Room.DoesNotExist:
         return Response({
-            'error': 'Sala no encontrada'
+            'error': f'Sala con ID {room_id} no encontrada o inactiva'
         }, status=status.HTTP_404_NOT_FOUND)
+    except ValueError:
+        return Response({
+            'error': f'ID de sala inválido: {room_id}'
+        }, status=status.HTTP_400_BAD_REQUEST)

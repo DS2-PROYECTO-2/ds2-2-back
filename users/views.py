@@ -94,8 +94,8 @@ def logout_view(request):
         }, status=status.HTTP_200_OK)
     except Exception as e:
         return Response({
-            'error': 'Error durante el logout'
-        }, status=status.HTTP_400_BAD_REQUEST)
+            'error': f'Error durante el logout: {str(e)}'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(['GET'])
@@ -182,8 +182,12 @@ def admin_verify_user_view(request, user_id):
         user = User.objects.get(id=user_id)
     except User.DoesNotExist:
         return Response({
-            'error': 'Usuario no encontrado'
+            'error': f'Usuario con ID {user_id} no encontrado'
         }, status=status.HTTP_404_NOT_FOUND)
+    except ValueError:
+        return Response({
+            'error': f'ID de usuario inválido: {user_id}'
+        }, status=status.HTTP_400_BAD_REQUEST)
     
     serializer = AdminUserVerificationSerializer(
         user, 
