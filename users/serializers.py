@@ -26,11 +26,27 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
 
     def validate(self, attrs):
         if attrs['password'] != attrs['password_confirm']:
-            raise serializers.ValidationError("Las contraseñas no coinciden")
+            raise serializers.ValidationError({
+                'password_confirm': ['Las contraseñas no coinciden']
+            })
         
         # Validar que la identificación no exista
         if User.objects.filter(identification=attrs['identification']).exists():
-            raise serializers.ValidationError("Ya existe un usuario con esta identificación")
+            raise serializers.ValidationError({
+                'identification': ['Ya existe un usuario con esta identificación']
+            })
+        
+        # Validar que el username no exista
+        if User.objects.filter(username=attrs['username']).exists():
+            raise serializers.ValidationError({
+                'username': ['Ya existe un usuario con este nombre de usuario']
+            })
+        
+        # Validar que el email no exista
+        if User.objects.filter(email=attrs['email']).exists():
+            raise serializers.ValidationError({
+                'email': ['Ya existe un usuario con este email']
+            })
         
         return attrs
 
@@ -201,11 +217,21 @@ class ChangePasswordSerializer(serializers.Serializer):
 
     def validate(self, attrs):
         if attrs['new_password'] != attrs['new_password_confirm']:
-            raise serializers.ValidationError("Las nuevas contraseñas no coinciden")
+            raise serializers.ValidationError({
+                'new_password_confirm': ['Las nuevas contraseñas no coinciden']
+            })
         
         user = self.context['request'].user
         if not user.check_password(attrs['old_password']):
-            raise serializers.ValidationError("La contraseña actual es incorrecta")
+            raise serializers.ValidationError({
+                'old_password': ['La contraseña actual es incorrecta']
+            })
+        
+        # Validar que la nueva contraseña sea diferente a la actual
+        if user.check_password(attrs['new_password']):
+            raise serializers.ValidationError({
+                'new_password': ['La nueva contraseña debe ser diferente a la actual']
+            })
         
         return attrs
 
