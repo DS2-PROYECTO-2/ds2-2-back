@@ -2,6 +2,7 @@ from rest_framework import status, generics, permissions
 from rest_framework.decorators import api_view, permission_classes, authentication_classes
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.response import Response
+from django.http import HttpResponse
 from rest_framework.authtoken.models import Token
 from django.contrib.auth import login, logout, update_session_auth_hash
 from django.utils import timezone
@@ -18,6 +19,27 @@ from .serializers import (
     ChangePasswordSerializer
 )
 from .permissions import IsAdminUser, IsVerifiedUser, CanManageUsers
+from django.conf import settings
+from users.utils import verify_action_token
+from .models import ApprovalLink
+import hashlib
+from django.utils import timezone
+def _html_message(text: str, ok: bool) -> str:
+    color = "#16a34a" if ok else "#dc2626"
+    title = "Operación exitosa" if ok else "No se pudo completar la operación"
+    return f"""<!doctype html><html><head><meta charset=\"utf-8\"><title>{title}</title></head>
+<body style=\"font-family:system-ui,Segoe UI,Arial;margin:40px;background:#f6f7f9;\">
+  <div style=\"max-width:640px;margin:0 auto;background:#ffffff;border-radius:12px;box-shadow:0 6px 24px rgba(0,0,0,.08);overflow:hidden;\">
+    <div style=\"padding:20px 24px;border-bottom:1px solid #eef2f7;\">
+      <h2 style=\"margin:0;color:{color};\">{title}</h2>
+    </div>
+    <div style=\"padding:20px 24px;\">
+      <p style=\"white-space:pre-wrap;color:#111827;\">{text}</p>
+    </div>
+  </div>
+  <p style=\"text-align:center;color:#9ca3af;font-size:12px;margin-top:16px;\">DS2 • Confirmación</p>
+</body></html>"""
+
 
 
 @csrf_exempt
@@ -151,7 +173,8 @@ def change_password_view(request):
 
 
 @api_view(['GET'])
-@permission_classes([permissions.AllowAny])
+@authentication_classes([TokenAuthentication])
+@permission_classes([IsAdminUser])
 def admin_users_list_view(request):
     """
     Vista para que los administradores vean la lista de usuarios
@@ -173,7 +196,8 @@ def admin_users_list_view(request):
 
 @csrf_exempt
 @api_view(['PATCH'])
-@permission_classes([permissions.AllowAny])
+@authentication_classes([TokenAuthentication])
+@permission_classes([IsAdminUser])
 def admin_verify_user_view(request, user_id):
     """
     Vista para que los administradores verifiquen usuarios
@@ -248,3 +272,96 @@ def dashboard_view(request):
             },
             'message': f'Bienvenido, {user.get_full_name()}'
         })
+
+@api_view(['DELETE'])
+@authentication_classes([TokenAuthentication])
+@permission_classes([IsAdminUser])  # usa tu permiso de admin
+def admin_delete_user_view(request, user_id):
+    try:
+        user = User.objects.get(id=user_id)
+    except User.DoesNotExist:
+        return Response({'error': f'Usuario con ID {user_id} no encontrado'}, status=status.HTTP_404_NOT_FOUND)
+
+    user.delete()  # esto dispara post_delete y enviará el correo
+    return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+@api_view(['GET'])
+@permission_classes([])  # validación por token, no requiere login
+def admin_user_activate_via_token(request):
+    token = request.query_params.get("token")
+    if not token:
+        return HttpResponse(_html_message("Falta token.", False), status=status.HTTP_400_BAD_REQUEST)
+    
+    # Hash del token para buscar en DB
+    token_hash = hashlib.sha256(token.encode()).hexdigest()
+    
+    try:
+        approval_link = ApprovalLink.objects.get(
+            token_hash=token_hash,
+            action=ApprovalLink.APPROVE
+        )
+    except ApprovalLink.DoesNotExist:
+        return HttpResponse(_html_message("Enlace inválido.", False), status=status.HTTP_400_BAD_REQUEST)
+    
+    # Validar que no esté usado ni expirado
+    if not approval_link.is_valid():
+        if approval_link.is_used():
+            return HttpResponse(_html_message("Este enlace ya fue usado.", False), status=status.HTTP_400_BAD_REQUEST)
+        elif approval_link.is_expired():
+            return HttpResponse(_html_message("El enlace expiró.", False), status=status.HTTP_400_BAD_REQUEST)
+    
+    user = approval_link.user
+    
+    # Marcar ambos enlaces (approve y reject) como usados para invalidar ambos
+    ApprovalLink.objects.filter(
+        user=user,
+        action__in=[ApprovalLink.APPROVE, ApprovalLink.REJECT]
+    ).update(used_at=timezone.now())
+    
+    # Ejecutar la acción
+    user._verification_changed = True
+    user.is_verified = True
+    user.verified_by = None  # sin sesión; opcional
+    user.save()
+    
+    return HttpResponse(_html_message(f"El usuario @{user.username} ha sido verificado.", True), status=200)
+
+@api_view(['GET'])
+@permission_classes([])
+def admin_user_delete_via_token(request):
+    token = request.query_params.get("token")
+    if not token:
+        return HttpResponse(_html_message("Falta token.", False), status=status.HTTP_400_BAD_REQUEST)
+    
+    # Hash del token para buscar en DB
+    token_hash = hashlib.sha256(token.encode()).hexdigest()
+    
+    try:
+        approval_link = ApprovalLink.objects.get(
+            token_hash=token_hash,
+            action=ApprovalLink.REJECT
+        )
+    except ApprovalLink.DoesNotExist:
+        return HttpResponse(_html_message("Enlace inválido.", False), status=status.HTTP_400_BAD_REQUEST)
+    
+    # Validar que no esté usado ni expirado
+    if not approval_link.is_valid():
+        if approval_link.is_used():
+            return HttpResponse(_html_message("Este enlace ya fue usado.", False), status=status.HTTP_400_BAD_REQUEST)
+        elif approval_link.is_expired():
+            return HttpResponse(_html_message("El enlace expiró.", False), status=status.HTTP_400_BAD_REQUEST)
+    
+    user = approval_link.user
+    
+    # Marcar ambos enlaces (approve y reject) como usados para invalidar ambos
+    ApprovalLink.objects.filter(
+        user=user,
+        action__in=[ApprovalLink.APPROVE, ApprovalLink.REJECT]
+    ).update(used_at=timezone.now())
+    
+    # Ejecutar la acción
+    username = user.username
+    user.delete()  # esto dispara post_delete y enviará el correo
+    
+    return HttpResponse(_html_message(f"El usuario @{username} ha sido eliminado.", True), status=200)

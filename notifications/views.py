@@ -8,7 +8,7 @@ class NotificationViewSet(viewsets.ModelViewSet):
     API endpoint para gestionar notificaciones
     """
     serializer_class = NotificationSerializer
-    permission_classes = [permissions.AllowAny]
+    permission_classes = [permissions.IsAuthenticated]
     
     def get_queryset(self):
         """
