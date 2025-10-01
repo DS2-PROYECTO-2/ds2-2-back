@@ -24,6 +24,12 @@ from users.utils import verify_action_token
 from .models import ApprovalLink
 import hashlib
 from django.utils import timezone
+from .serializers import PasswordResetRequestSerializer, PasswordResetConfirmSerializer
+from rest_framework.permissions import AllowAny
+from django.db import transaction
+
+
+
 def _html_message(text: str, ok: bool) -> str:
     color = "#16a34a" if ok else "#dc2626"
     title = "Operación exitosa" if ok else "No se pudo completar la operación"
@@ -304,27 +310,26 @@ def admin_user_activate_via_token(request):
     except ApprovalLink.DoesNotExist:
         return HttpResponse(_html_message("Enlace inválido.", False), status=status.HTTP_400_BAD_REQUEST)
     
-    # Validar que no esté usado ni expirado
     if not approval_link.is_valid():
-        if approval_link.is_used():
-            return HttpResponse(_html_message("Este enlace ya fue usado.", False), status=status.HTTP_400_BAD_REQUEST)
-        elif approval_link.is_expired():
-            return HttpResponse(_html_message("El enlace expiró.", False), status=status.HTTP_400_BAD_REQUEST)
-    
+        # Si expiró o ya fue usado, opcionalmente bórralo aquí:
+        approval_link.delete()
+        return HttpResponse(
+            _html_message("El enlace expiró." if approval_link.is_expired() else "Este enlace ya fue usado.", False),
+            status=400
+        )
+
     user = approval_link.user
-    
-    # Marcar ambos enlaces (approve y reject) como usados para invalidar ambos
-    ApprovalLink.objects.filter(
-        user=user,
-        action__in=[ApprovalLink.APPROVE, ApprovalLink.REJECT]
-    ).update(used_at=timezone.now())
-    
-    # Ejecutar la acción
-    user._verification_changed = True
-    user.is_verified = True
-    user.verified_by = None  # sin sesión; opcional
-    user.save()
-    
+
+    with transaction.atomic():
+        # aplicar acción
+        user._verification_changed = True
+        user.is_verified = True
+        user.verified_by = None
+        user.save()
+
+        # borrar ambos (approve/reject) para este usuario
+        ApprovalLink.objects.filter(user=user).delete()
+
     return HttpResponse(_html_message(f"El usuario @{user.username} ha sido verificado.", True), status=200)
 
 @api_view(['GET'])
@@ -345,23 +350,37 @@ def admin_user_delete_via_token(request):
     except ApprovalLink.DoesNotExist:
         return HttpResponse(_html_message("Enlace inválido.", False), status=status.HTTP_400_BAD_REQUEST)
     
-    # Validar que no esté usado ni expirado
     if not approval_link.is_valid():
-        if approval_link.is_used():
-            return HttpResponse(_html_message("Este enlace ya fue usado.", False), status=status.HTTP_400_BAD_REQUEST)
-        elif approval_link.is_expired():
-            return HttpResponse(_html_message("El enlace expiró.", False), status=status.HTTP_400_BAD_REQUEST)
-    
+        approval_link.delete()
+        return HttpResponse(
+            _html_message("El enlace expiró." if approval_link.is_expired() else "Este enlace ya fue usado.", False),
+            status=400
+        )
+
     user = approval_link.user
-    
-    # Marcar ambos enlaces (approve y reject) como usados para invalidar ambos
-    ApprovalLink.objects.filter(
-        user=user,
-        action__in=[ApprovalLink.APPROVE, ApprovalLink.REJECT]
-    ).update(used_at=timezone.now())
-    
-    # Ejecutar la acción
     username = user.username
-    user.delete()  # esto dispara post_delete y enviará el correo
-    
+
+    with transaction.atomic():
+        # borrar ambos enlaces primero para no dejar basura si falla delete
+        ApprovalLink.objects.filter(user=user).delete()
+        user.delete()  # dispara post_delete y envía correo
+
     return HttpResponse(_html_message(f"El usuario @{username} ha sido eliminado.", True), status=200)
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def password_reset_request_view(request):
+    serializer = PasswordResetRequestSerializer(data=request.data)
+    if serializer.is_valid():
+        serializer.save()
+        return Response({'message': 'Si el email existe, recibirás un enlace de restablecimiento'}, status=status.HTTP_200_OK)
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def password_reset_confirm_view(request):
+    serializer = PasswordResetConfirmSerializer(data=request.data)
+    if serializer.is_valid():
+        serializer.save()
+        return Response({'message': 'Contraseña actualizada correctamente'}, status=status.HTTP_200_OK)
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

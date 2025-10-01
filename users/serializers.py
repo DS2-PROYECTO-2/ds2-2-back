@@ -2,7 +2,13 @@ from rest_framework import serializers
 from django.contrib.auth import authenticate
 from django.utils import timezone
 from .models import User
+from .utils import generate_raw_token, hash_token, build_password_reset_url
+from datetime import timedelta
+from django.contrib.auth import get_user_model
+from .models import PasswordReset
+from .services import send_password_reset_email
 
+User = get_user_model()
 
 class UserRegistrationSerializer(serializers.ModelSerializer):
     """
@@ -240,3 +246,63 @@ class ChangePasswordSerializer(serializers.Serializer):
         user.set_password(self.validated_data['new_password'])
         user.save()
         return user
+
+class PasswordResetRequestSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+
+    def create(self, validated_data):
+        email = validated_data['email']
+        try:
+            user = User.objects.get(email=email, is_active=True)
+        except User.DoesNotExist:
+            # Responder igual para no revelar existencia
+            return {}
+
+        raw_token = generate_raw_token()
+        token_hash = hash_token(raw_token)
+
+        PasswordReset.objects.create(
+            user=user,
+            token_hash=token_hash,
+            expires_at=timezone.now() + timedelta(hours=2),
+        )
+
+        reset_url = build_password_reset_url(raw_token)
+        send_password_reset_email(user, reset_url)
+        return {}
+
+class PasswordResetConfirmSerializer(serializers.Serializer):
+    token = serializers.CharField()
+    new_password = serializers.CharField(min_length=8)
+    new_password_confirm = serializers.CharField()
+
+    def validate(self, attrs):
+        if attrs['new_password'] != attrs['new_password_confirm']:
+            raise serializers.ValidationError({
+                'new_password_confirm': ['Las contraseñas no coinciden']
+            })
+        return attrs
+
+    def create(self, validated_data):
+        token_hash = hash_token(validated_data['token'])
+        try:
+            pr = PasswordReset.objects.get(token_hash=token_hash)
+        except PasswordReset.DoesNotExist:
+            raise serializers.ValidationError({'token': ['Token inválido']})
+
+        if not pr.is_valid():
+            # Limpieza “just-in-time” de expirados
+            if pr.is_expired():
+                pr.delete()
+                raise serializers.ValidationError({'token': ['Token expirado']})
+            raise serializers.ValidationError({'token': ['Token ya fue usado']})
+
+        user = pr.user
+        if user.check_password(validated_data['new_password']):
+            raise serializers.ValidationError({'new_password': ['La nueva contraseña debe ser diferente a la actual']})
+
+        user.set_password(validated_data['new_password'])
+        user.save()
+
+        pr.mark_as_used()
+        return {}

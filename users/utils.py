@@ -1,5 +1,10 @@
 import json
 from django.core.signing import TimestampSigner, BadSignature, SignatureExpired
+import secrets
+import hashlib
+from urllib.parse import quote
+from django.conf import settings
+from django.urls import reverse
 
 _SIGNER = TimestampSigner(salt="user-approval-links")
 
@@ -15,3 +20,15 @@ def verify_action_token(token: str, max_age_seconds: int = 86400) -> dict:
         raise ValueError("El enlace expiró")
     except BadSignature:
         raise ValueError("Enlace inválido")
+    
+
+
+def generate_raw_token() -> str:
+    return secrets.token_urlsafe(32)
+
+def hash_token(raw_token: str) -> str:
+    return hashlib.sha256(raw_token.encode()).hexdigest()
+
+def build_password_reset_url(raw_token: str) -> str:
+    base = getattr(settings, "PUBLIC_BASE_URL", "http://localhost:8000")
+    return f"{base}{reverse('password_reset_confirm')}?token={quote(raw_token, safe='')}"

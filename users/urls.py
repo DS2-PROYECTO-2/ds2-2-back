@@ -24,5 +24,8 @@ urlpatterns = [
     path('admin/users/activate/', views.admin_user_activate_via_token, name='admin_user_activate'),
     path('admin/users/delete/', views.admin_user_delete_via_token, name='admin_user_delete'),
 
+    path('password/reset-request/', views.password_reset_request_view, name='password_reset_request'),
+    path('password/reset-confirm/', views.password_reset_confirm_view, name='password_reset_confirm'),
+
 
 ]

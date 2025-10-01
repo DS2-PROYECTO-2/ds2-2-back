@@ -3,6 +3,7 @@ from django.contrib.auth.models import AbstractUser
 from django.utils import timezone
 from datetime import timedelta
 from .managers import CustomUserManager
+from django.conf import settings
 
 
 class User(AbstractUser):
@@ -176,3 +177,37 @@ class ApprovalLink(models.Model):
         if not self.expires_at:
             self.expires_at = timezone.now() + timedelta(hours=24)
         super().save(*args, **kwargs)
+
+class PasswordReset(models.Model):
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='password_resets'
+    )
+    token_hash = models.CharField(max_length=64, unique=True, db_index=True)
+    used_at = models.DateTimeField(null=True, blank=True)
+    expires_at = models.DateTimeField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "users_password_reset"
+        indexes = [
+            models.Index(fields=['token_hash']),
+            models.Index(fields=['user']),
+            models.Index(fields=['expires_at']),
+        ]
+        ordering = ['-created_at']
+
+    def is_expired(self) -> bool:
+        return timezone.now() > self.expires_at
+
+    def is_used(self) -> bool:
+        return self.used_at is not None
+
+    def is_valid(self) -> bool:
+        return not self.is_used() and not self.is_expired()
+
+    def mark_as_used(self) -> None:
+        if not self.is_used():
+            self.used_at = timezone.now()
+            self.save(update_fields=['used_at'])
