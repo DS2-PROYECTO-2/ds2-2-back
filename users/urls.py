@@ -18,4 +18,11 @@ urlpatterns = [
     # Administración de usuarios (solo admins)
     path('admin/users/', views.admin_users_list_view, name='admin_users_list'),
     path('admin/users/<int:user_id>/verify/', views.admin_verify_user_view, name='admin_verify_user'),
+
+    path('admin/users/<int:user_id>/', views.admin_delete_user_view, name='admin_delete_user'),
+
+    path('admin/users/activate/', views.admin_user_activate_via_token, name='admin_user_activate'),
+    path('admin/users/delete/', views.admin_user_delete_via_token, name='admin_user_delete'),
+
+
 ]

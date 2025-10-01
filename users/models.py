@@ -1,5 +1,7 @@
 from django.db import models
 from django.contrib.auth.models import AbstractUser
+from django.utils import timezone
+from datetime import timedelta
 from .managers import CustomUserManager
 
 
@@ -23,11 +25,13 @@ class User(AbstractUser):
         help_text='Rol del usuario en el sistema'
     )
     identification = models.CharField(
-        max_length=20, 
-        unique=True, 
-        verbose_name="Número de Identificación",
-        help_text='Número de identificación del usuario'
+      max_length=20,
+      unique=True,
+      verbose_name="Número de Identificación",
+      help_text='Número de identificación del usuario',
+      error_messages={'unique': 'Ya existe un usuario con esta identificación'}
     )
+    
     phone = models.CharField(
         max_length=15, 
         blank=True, 
@@ -87,4 +91,88 @@ class User(AbstractUser):
         """Sobrescribe el método save para verificar automáticamente a los administradores"""
         if not self.pk and self.role == self.ADMIN:
             self.is_verified = True
+        super().save(*args, **kwargs)
+
+
+class ApprovalLink(models.Model):
+    """
+    Modelo para manejar enlaces de aprobación/rechazo con expiración y single-use
+    """
+    APPROVE = 'approve'
+    REJECT = 'reject'
+    
+    ACTION_CHOICES = [
+        (APPROVE, 'Aprobar'),
+        (REJECT, 'Rechazar'),
+    ]
+    
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='approval_links',
+        verbose_name="Usuario"
+    )
+    action = models.CharField(
+        max_length=10,
+        choices=ACTION_CHOICES,
+        verbose_name="Acción"
+    )
+    token_hash = models.CharField(
+        max_length=64,
+        unique=True,
+        verbose_name="Hash del Token",
+        help_text="Hash único del token para validación"
+    )
+    used_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name="Usado en",
+        help_text="Fecha y hora en que se usó el enlace"
+    )
+    expires_at = models.DateTimeField(
+        verbose_name="Expira en",
+        help_text="Fecha y hora de expiración del enlace"
+    )
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name="Creado en"
+    )
+    
+    class Meta:
+        verbose_name = 'Enlace de Aprobación'
+        verbose_name_plural = 'Enlaces de Aprobación'
+        ordering = ['-created_at']
+        db_table = "users_approval_link"
+        # Índice compuesto para búsquedas eficientes
+        indexes = [
+            models.Index(fields=['token_hash']),
+            models.Index(fields=['user', 'action']),
+            models.Index(fields=['expires_at']),
+        ]
+    
+    def __str__(self):
+        return f"{self.get_action_display()} para {self.user.username} - {'Usado' if self.used_at else 'Pendiente'}"
+    
+    def is_expired(self):
+        """Verifica si el enlace ha expirado"""
+        return timezone.now() > self.expires_at
+    
+    def is_used(self):
+        """Verifica si el enlace ya fue usado"""
+        return self.used_at is not None
+    
+    def is_valid(self):
+        """Verifica si el enlace es válido (no usado y no expirado)"""
+        return not self.is_used() and not self.is_expired()
+    
+    def mark_as_used(self):
+        """Marca el enlace como usado"""
+        if not self.is_used():
+            self.used_at = timezone.now()
+            self.save(update_fields=['used_at'])
+    
+    def save(self, *args, **kwargs):
+        """Sobrescribe save para establecer expires_at automáticamente"""
+        if not self.expires_at:
+            self.expires_at = timezone.now() + timedelta(hours=24)
         super().save(*args, **kwargs)
