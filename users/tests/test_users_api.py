@@ -41,9 +41,24 @@ class UsersApiTests(TestCase):
         response = self.client.get(url, HTTP_AUTHORIZATION=f"Token {token.key}")
         self.assertEqual(response.status_code, 200)
 
-    def test_admin_users_list_public_allows_any(self):
-        # Según views, AllowAny en admin_users_list_view
+    def test_admin_users_list_requires_admin_auth(self):
         url = "/api/auth/admin/users/"
+        # Sin autenticación debe responder 401
         response = self.client.get(url)
+        self.assertEqual(response.status_code, 401)
+
+    def test_admin_users_list_with_admin_token(self):
+        # Crear admin verificado y acceder con token
+        admin = User.objects.create_user(
+            identification="ID-ADM-1",
+            username="admin1",
+            email="admin1@example.com",
+            password="adminpass123",
+            role="admin",
+            is_verified=True,
+        )
+        token, _ = Token.objects.get_or_create(user=admin)
+        url = "/api/auth/admin/users/"
+        response = self.client.get(url, HTTP_AUTHORIZATION=f"Token {token.key}")
         self.assertEqual(response.status_code, 200)
 
