@@ -30,5 +30,6 @@ def hash_token(raw_token: str) -> str:
     return hashlib.sha256(raw_token.encode()).hexdigest()
 
 def build_password_reset_url(raw_token: str) -> str:
-    base = getattr(settings, "PUBLIC_BASE_URL", "http://localhost:8000")
-    return f"{base}{reverse('password_reset_confirm')}?token={quote(raw_token, safe='')}"
+    # URL del frontend para reset de contraseña
+    frontend_base = getattr(settings, "FRONTEND_BASE_URL", "http://localhost:5173")
+    return f"{frontend_base}/reset-password?token={quote(raw_token, safe='')}"
