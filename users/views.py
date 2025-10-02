@@ -3,6 +3,7 @@ from rest_framework.decorators import api_view, permission_classes, authenticati
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.response import Response
 from django.http import HttpResponse
+from django.shortcuts import redirect
 from rest_framework.authtoken.models import Token
 from django.contrib.auth import login, logout, update_session_auth_hash
 from django.utils import timezone
@@ -297,7 +298,7 @@ def admin_delete_user_view(request, user_id):
 def admin_user_activate_via_token(request):
     token = request.query_params.get("token")
     if not token:
-        return HttpResponse(_html_message("Falta token.", False), status=status.HTTP_400_BAD_REQUEST)
+        return redirect(f"{settings.FRONTEND_BASE_URL}/admin/approval?error=missing_token")
     
     # Hash del token para buscar en DB
     token_hash = hashlib.sha256(token.encode()).hexdigest()
@@ -308,15 +309,13 @@ def admin_user_activate_via_token(request):
             action=ApprovalLink.APPROVE
         )
     except ApprovalLink.DoesNotExist:
-        return HttpResponse(_html_message("Enlace inválido.", False), status=status.HTTP_400_BAD_REQUEST)
-    
+        return redirect(f"{settings.FRONTEND_BASE_URL}/admin/approval?error=invalid_token")
+
     if not approval_link.is_valid():
-        # Si expiró o ya fue usado, opcionalmente bórralo aquí:
+        # Si expiró o ya fue usado, bórralo y redirige con error
         approval_link.delete()
-        return HttpResponse(
-            _html_message("El enlace expiró." if approval_link.is_expired() else "Este enlace ya fue usado.", False),
-            status=400
-        )
+        error_type = "expired" if approval_link.is_expired() else "used"
+        return redirect(f"{settings.FRONTEND_BASE_URL}/admin/approval?error={error_type}")
 
     user = approval_link.user
 
@@ -330,14 +329,15 @@ def admin_user_activate_via_token(request):
         # borrar ambos (approve/reject) para este usuario
         ApprovalLink.objects.filter(user=user).delete()
 
-    return HttpResponse(_html_message(f"El usuario @{user.username} ha sido verificado.", True), status=200)
+    # Redirigir al frontend con éxito
+    return redirect(f"{settings.FRONTEND_BASE_URL}/admin/approval?action=approved&user={user.username}")
 
 @api_view(['GET'])
 @permission_classes([])
 def admin_user_delete_via_token(request):
     token = request.query_params.get("token")
     if not token:
-        return HttpResponse(_html_message("Falta token.", False), status=status.HTTP_400_BAD_REQUEST)
+        return redirect(f"{settings.FRONTEND_BASE_URL}/admin/approval?error=missing_token")
     
     # Hash del token para buscar en DB
     token_hash = hashlib.sha256(token.encode()).hexdigest()
@@ -348,14 +348,12 @@ def admin_user_delete_via_token(request):
             action=ApprovalLink.REJECT
         )
     except ApprovalLink.DoesNotExist:
-        return HttpResponse(_html_message("Enlace inválido.", False), status=status.HTTP_400_BAD_REQUEST)
+        return redirect(f"{settings.FRONTEND_BASE_URL}/admin/approval?error=invalid_token")
     
     if not approval_link.is_valid():
         approval_link.delete()
-        return HttpResponse(
-            _html_message("El enlace expiró." if approval_link.is_expired() else "Este enlace ya fue usado.", False),
-            status=400
-        )
+        error_type = "expired" if approval_link.is_expired() else "used"
+        return redirect(f"{settings.FRONTEND_BASE_URL}/admin/approval?error={error_type}")
 
     user = approval_link.user
     username = user.username
@@ -365,7 +363,8 @@ def admin_user_delete_via_token(request):
         ApprovalLink.objects.filter(user=user).delete()
         user.delete()  # dispara post_delete y envía correo
 
-    return HttpResponse(_html_message(f"El usuario @{username} ha sido eliminado.", True), status=200)
+    # Redirigir al frontend con éxito
+    return redirect(f"{settings.FRONTEND_BASE_URL}/admin/approval?action=rejected&user={username}")
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
@@ -376,11 +375,43 @@ def password_reset_request_view(request):
         return Response({'message': 'Si el email existe, recibirás un enlace de restablecimiento'}, status=status.HTTP_200_OK)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-@api_view(['POST'])
+@api_view(['GET', 'POST'])
 @permission_classes([AllowAny])
 def password_reset_confirm_view(request):
-    serializer = PasswordResetConfirmSerializer(data=request.data)
-    if serializer.is_valid():
-        serializer.save()
-        return Response({'message': 'Contraseña actualizada correctamente'}, status=status.HTTP_200_OK)
-    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    if request.method == 'GET':
+        # Validar token y devolver datos del usuario
+        token = request.query_params.get('token')
+        if not token:
+            return Response({'error': 'Token no proporcionado'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Verificar que el token existe y es válido
+        from users.utils import hash_token
+        from users.models import PasswordReset
+        import hashlib
+        
+        token_hash = hashlib.sha256(token.encode()).hexdigest()
+        try:
+            password_reset = PasswordReset.objects.get(token_hash=token_hash)
+            if not password_reset.is_valid():
+                return Response({'error': 'Token expirado o ya usado'}, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Devolver datos del usuario para el frontend
+            return Response({
+                'valid': True,
+                'user': {
+                    'id': password_reset.user.id,
+                    'username': password_reset.user.username,
+                    'email': password_reset.user.email,
+                    'full_name': password_reset.user.get_full_name()
+                }
+            }, status=status.HTTP_200_OK)
+            
+        except PasswordReset.DoesNotExist:
+            return Response({'error': 'Token inválido'}, status=status.HTTP_400_BAD_REQUEST)
+    
+    else:  # POST
+        serializer = PasswordResetConfirmSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response({'message': 'Contraseña actualizada correctamente'}, status=status.HTTP_200_OK)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

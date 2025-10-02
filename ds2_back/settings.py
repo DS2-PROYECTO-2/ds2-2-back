@@ -201,3 +201,5 @@ EMAIL_HOST_PASSWORD = env('EMAIL_HOST_PASSWORD', default='')
 DEFAULT_FROM_EMAIL = env('DEFAULT_FROM_EMAIL', default=EMAIL_HOST_USER)
 # URL pública base para construir enlaces en correos
 PUBLIC_BASE_URL = "http://localhost:8000"
+# URL del frontend para enlaces de reset de contraseña
+FRONTEND_BASE_URL = "http://localhost:5173"
