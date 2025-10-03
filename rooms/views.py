@@ -77,8 +77,9 @@ def room_entry_create_view(request):
         except Room.DoesNotExist:
             return Response({
                 'error': 'Sala no encontrada o inactiva',
-                'room_id': room_id
-            }, status=status.HTTP_404_NOT_FOUND)
+                'room_id': room_id,
+                'field': 'room'
+            }, status=status.HTTP_400_BAD_REQUEST)
         
         # Usar el servicio de lógica de negocio
         result = RoomEntryBusinessLogic.create_room_entry_with_validations(
@@ -145,11 +146,16 @@ def room_entry_exit_view(request, entry_id):
             
             return Response(response_data, status=status.HTTP_200_OK)
         else:
-            # Error de validación
+            # Determinar el código de estado según el tipo de error
+            if result.get('error_type') == 'NOT_FOUND':
+                status_code = status.HTTP_404_NOT_FOUND
+            else:
+                status_code = status.HTTP_400_BAD_REQUEST
+                
             return Response({
                 'error': result['error'],
                 'details': result['details']
-            }, status=status.HTTP_400_BAD_REQUEST)
+            }, status=status_code)
             
     except Exception as e:
         return Response({

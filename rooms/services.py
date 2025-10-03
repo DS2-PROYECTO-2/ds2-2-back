@@ -178,10 +178,19 @@ class RoomEntryBusinessLogic:
         """
         try:
             # Buscar la entrada activa del usuario - Solución minimalista
-            entry = RoomEntry.objects.select_for_update().get(
-                id=entry_id,
-                user=user
-            )
+            try:
+                entry = RoomEntry.objects.select_for_update().get(
+                    id=entry_id,
+                    user=user
+                )
+            except RoomEntry.DoesNotExist:
+                # Error específico para entrada no encontrada (404)
+                return {
+                    'success': False,
+                    'error': 'Entrada no encontrada',
+                    'details': f'No se encontró entrada con ID {entry_id} para el usuario actual',
+                    'error_type': 'NOT_FOUND'
+                }
             
             # Verificar si ya fue finalizada
             if entry.exit_time is not None:
@@ -316,7 +325,7 @@ class RoomEntryBusinessLogic:
         total_hours = round(total_minutes / 60, 2) if total_minutes > 0 else 0
         
         return {
-            'date': date,
+            'date': date.isoformat() if date else timezone.now().date().isoformat(),
             'total_sessions': entries.count(),
             'completed_sessions': completed_sessions,
             'active_sessions': active_sessions,

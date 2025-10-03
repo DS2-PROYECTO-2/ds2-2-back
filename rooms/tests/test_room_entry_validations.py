@@ -180,7 +180,7 @@ class RoomEntryValidationsTestCase(TestCase):
         
         # Verificar que se creó la notificación
         notification = Notification.objects.filter(
-            recipient=self.admin,
+            user=self.admin,
             notification_type='excessive_hours'
         ).first()
         
@@ -213,7 +213,7 @@ class RoomEntryValidationsTestCase(TestCase):
         
         # Verificar que NO se creó notificación
         notification_count = Notification.objects.filter(
-            recipient=self.admin,
+            user=self.admin,
             notification_type='excessive_hours'
         ).count()
         
@@ -302,29 +302,34 @@ class RoomEntryValidationsTestCase(TestCase):
         """
         today = timezone.now().date()
         
-        # Crear múltiples entradas para hoy
-        base_time = timezone.now() - timedelta(hours=10)
+        # Crear múltiples entradas para hoy usando hora específica del día actual
+        from datetime import datetime, time
+        base_datetime = datetime.combine(today, time(10, 0))  # 10:00 AM de hoy
+        base_time = timezone.make_aware(base_datetime)
         
         entry1 = RoomEntry.objects.create(
             user=self.monitor,
-            room=self.room1,
-            entry_time=base_time,
-            exit_time=base_time + timedelta(hours=2)  # 2 horas
+            room=self.room1
         )
+        entry1.entry_time = base_time  # 10:00 AM
+        entry1.exit_time = base_time + timedelta(hours=2)  # 12:00 PM - 2 horas
+        entry1.save()
         
         entry2 = RoomEntry.objects.create(
             user=self.monitor,
-            room=self.room2,
-            entry_time=base_time + timedelta(hours=3),
-            exit_time=base_time + timedelta(hours=5)  # 2 horas
+            room=self.room2
         )
+        entry2.entry_time = base_time + timedelta(hours=3)  # 1:00 PM
+        entry2.exit_time = base_time + timedelta(hours=5)  # 3:00 PM - 2 horas
+        entry2.save()
         
         # Entrada activa
         entry3 = RoomEntry.objects.create(
             user=self.monitor,
-            room=self.room1,
-            entry_time=base_time + timedelta(hours=6)
+            room=self.room1
         )
+        entry3.entry_time = base_time + timedelta(hours=6)  # 4:00 PM - activa
+        entry3.save()
         
         # Obtener resumen
         summary = RoomEntryBusinessLogic.get_user_daily_summary(self.monitor, today)
