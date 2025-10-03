@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [ main, develop, EISC-38-Backend-Modelo-y-endpoints-para-Registro-de-ingreso-salida-en-sala ]
   pull_request:
     branches: [ main, develop ]
 

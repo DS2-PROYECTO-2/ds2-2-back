@@ -317,14 +317,28 @@ Authorization: Token <token_admin>
 
 ---
 
-### 🏢 **SALAS** (`/api/rooms/`)
+### 🏢 **SALAS Y REGISTROS DE ENTRADA/SALIDA** (`/api/rooms/`)
 
 #### **10. Lista de salas**
 ```http
 GET /api/rooms/
 Authorization: Token <tu_token>
 ```
-**Estado**: 🔄 En desarrollo
+**Respuesta exitosa (200):**
+```json
+[
+    {
+        "id": 1,
+        "name": "Sala de Estudio 1",
+        "code": "S101",
+        "capacity": 20,
+        "description": "Sala principal de estudio",
+        "is_active": true,
+        "created_at": "2024-01-15T10:00:00Z"
+    }
+]
+```
+**Estado**: ✅ Probado y funcional
 
 ---
 
@@ -333,13 +347,214 @@ Authorization: Token <tu_token>
 GET /api/rooms/123/
 Authorization: Token <tu_token>
 ```
-**Estado**: 🔄 En desarrollo
+**Respuesta exitosa (200):**
+```json
+{
+    "id": 123,
+    "name": "Sala de Estudio 1",
+    "code": "S101",
+    "capacity": 20,
+    "description": "Sala principal de estudio",
+    "is_active": true,
+    "created_at": "2024-01-15T10:00:00Z"
+}
+```
+**Estado**: ✅ Probado y funcional
+
+---
+
+#### **12. Registrar ingreso a sala**
+```http
+POST /api/rooms/entry/
+Authorization: Token <tu_token>
+Content-Type: application/json
+```
+**Body:**
+```json
+{
+    "room": 1,
+    "notes": "Inicio de turno matutino"
+}
+```
+**Respuesta exitosa (201):**
+```json
+{
+    "message": "Ingreso registrado exitosamente",
+    "entry": {
+        "id": 456,
+        "user": 5,
+        "room": 1,
+        "user_name": "Juan Pérez",
+        "user_username": "monitor123",
+        "room_name": "Sala de Estudio 1",
+        "room_code": "S101",
+        "entry_time": "2024-01-15T14:30:00Z",
+        "exit_time": null,
+        "duration_hours": null,
+        "duration_minutes": null,
+        "duration_formatted": "En curso",
+        "is_active": true,
+        "notes": "Inicio de turno matutino"
+    }
+}
+```
+**Estado**: ✅ Probado y funcional
+
+---
+
+#### **13. Registrar salida de sala**
+```http
+PATCH /api/rooms/entry/456/exit/
+Authorization: Token <tu_token>
+Content-Type: application/json
+```
+**Body (opcional):**
+```json
+{
+    "notes": "Fin de turno"
+}
+```
+**Respuesta exitosa (200):**
+```json
+{
+    "message": "Salida registrada exitosamente",
+    "entry": {
+        "id": 456,
+        "user": 5,
+        "room": 1,
+        "user_name": "Juan Pérez",
+        "user_username": "monitor123",
+        "room_name": "Sala de Estudio 1",
+        "room_code": "S101",
+        "entry_time": "2024-01-15T14:30:00Z",
+        "exit_time": "2024-01-15T18:45:00Z",
+        "duration_hours": 4.25,
+        "duration_minutes": 255,
+        "duration_formatted": "4h 15m",
+        "is_active": false,
+        "notes": "Fin de turno"
+    }
+}
+```
+**Estado**: ✅ Probado y funcional
+
+---
+
+#### **14. Historial de entradas del usuario**
+```http
+GET /api/rooms/my-entries/
+Authorization: Token <tu_token>
+```
+**Respuesta exitosa (200):**
+```json
+{
+    "count": 15,
+    "entries": [
+        {
+            "id": 456,
+            "user": 5,
+            "room": 1,
+            "user_name": "Juan Pérez",
+            "user_username": "monitor123",
+            "room_name": "Sala de Estudio 1",
+            "room_code": "S101",
+            "entry_time": "2024-01-15T14:30:00Z",
+            "exit_time": "2024-01-15T18:45:00Z",
+            "duration_hours": 4.25,
+            "duration_minutes": 255,
+            "duration_formatted": "4h 15m",
+            "is_active": false,
+            "notes": "Turno completado"
+        }
+    ]
+}
+```
+**Estado**: ✅ Probado y funcional
+
+---
+
+#### **15. Entrada activa del usuario**
+```http
+GET /api/rooms/my-active-entry/
+Authorization: Token <tu_token>
+```
+**Respuesta con entrada activa (200):**
+```json
+{
+    "has_active_entry": true,
+    "active_entry": {
+        "id": 789,
+        "user": 5,
+        "room": 2,
+        "user_name": "Juan Pérez",
+        "user_username": "monitor123",
+        "room_name": "Sala de Estudio 2",
+        "room_code": "S102",
+        "entry_time": "2024-01-15T09:00:00Z",
+        "exit_time": null,
+        "duration_formatted": "En curso",
+        "is_active": true,
+        "notes": "Turno matutino"
+    }
+}
+```
+**Respuesta sin entrada activa (200):**
+```json
+{
+    "has_active_entry": false,
+    "active_entry": null
+}
+```
+**Estado**: ✅ Probado y funcional
+
+---
+
+#### **16. Ocupantes actuales de una sala**
+```http
+GET /api/rooms/123/occupants/
+Authorization: Token <tu_token>
+```
+**Respuesta exitosa (200):**
+```json
+{
+    "room": {
+        "id": 123,
+        "name": "Sala de Estudio 1",
+        "code": "S101",
+        "capacity": 20
+    },
+    "current_occupants": 2,
+    "entries": [
+        {
+            "id": 456,
+            "user": 5,
+            "user_name": "Juan Pérez",
+            "user_username": "monitor123",
+            "entry_time": "2024-01-15T14:30:00Z",
+            "duration_formatted": "En curso",
+            "is_active": true,
+            "notes": "Turno matutino"
+        },
+        {
+            "id": 457,
+            "user": 7,
+            "user_name": "María García",
+            "user_username": "monitor456",
+            "entry_time": "2024-01-15T15:00:00Z",
+            "duration_formatted": "En curso",
+            "is_active": true,
+            "notes": "Turno vespertino"
+        }
+    ]
+}
+```
+**Estado**: ✅ Probado y funcional
 
 ---
 
 ### 🔔 **NOTIFICACIONES** (`/api/notifications/`)
 
-#### **12. Gestión de notificaciones**
+#### **17. Gestión de notificaciones**
 ```http
 GET /api/notifications/notifications/
 Authorization: Token <tu_token>

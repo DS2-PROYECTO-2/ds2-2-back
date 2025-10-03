@@ -1,5 +1,6 @@
 from rest_framework import serializers
-from .models import Room
+from django.utils import timezone
+from .models import Room, RoomEntry
 
 
 class RoomSerializer(serializers.ModelSerializer):
@@ -13,3 +14,63 @@ class RoomSerializer(serializers.ModelSerializer):
             'is_active', 'created_at', 'updated_at'
         ]
         read_only_fields = ['id', 'created_at', 'updated_at']
+
+
+class RoomEntrySerializer(serializers.ModelSerializer):
+    """
+    Serializador para el modelo de Registro de Entrada/Salida (Sprint 2)
+    """
+    user_name = serializers.CharField(source='user.get_full_name', read_only=True)
+    user_username = serializers.CharField(source='user.username', read_only=True)
+    room_name = serializers.CharField(source='room.name', read_only=True)
+    room_code = serializers.CharField(source='room.code', read_only=True)
+    duration_hours = serializers.ReadOnlyField()
+    duration_minutes = serializers.ReadOnlyField()
+    duration_formatted = serializers.CharField(source='get_duration_formatted', read_only=True)
+    is_active = serializers.ReadOnlyField()
+    
+    class Meta:
+        model = RoomEntry
+        fields = [
+            'id', 'user', 'room', 'user_name', 'user_username',
+            'room_name', 'room_code', 'entry_time', 'exit_time',
+            'duration_hours', 'duration_minutes', 'duration_formatted',
+            'is_active', 'notes', 'created_at', 'updated_at'
+        ]
+        read_only_fields = [
+            'id', 'entry_time', 'duration_hours', 'duration_minutes',
+            'duration_formatted', 'is_active', 'created_at', 'updated_at'
+        ]
+
+
+class RoomEntryCreateSerializer(serializers.ModelSerializer):
+    """
+    Serializador específico para crear entradas (solo requiere room)
+    """
+    class Meta:
+        model = RoomEntry
+        fields = ['room', 'notes']
+    
+    def create(self, validated_data):
+        # El usuario se asigna automáticamente desde request.user
+        validated_data['user'] = self.context['request'].user
+        return super().create(validated_data)
+
+
+class RoomEntryExitSerializer(serializers.ModelSerializer):
+    """
+    Serializador específico para registrar salida
+    """
+    class Meta:
+        model = RoomEntry
+        fields = ['notes']
+    
+    def update(self, instance, validated_data):
+        # Solo actualizar si no tiene exit_time previo
+        if not instance.exit_time:
+            instance.exit_time = timezone.now()
+            # Actualizar notes si se proporcionan
+            if 'notes' in validated_data:
+                instance.notes = validated_data['notes']
+            instance.save()
+        return instance

@@ -97,63 +97,24 @@ class RoomEntry(models.Model):
         # Duración en horas (con dos decimales)
         hours = duration.total_seconds() / 3600
         return round(hours, 2)
-
-
-class RoomEntry(models.Model):
-    """
-    Modelo para registrar entradas y salidas de monitores a las salas
-    Sprint 2: Control de ingreso/salida con validación de simultaneidad
-    """
-    user = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.CASCADE,
-        related_name='room_entries',
-        help_text='Monitor que ingresa a la sala'
-    )
-    room = models.ForeignKey(
-        Room,
-        on_delete=models.CASCADE,
-        related_name='entries',
-        help_text='Sala a la que ingresa el monitor'
-    )
-    entry_time = models.DateTimeField(
-        auto_now_add=True,
-        help_text='Fecha y hora de entrada a la sala'
-    )
-    exit_time = models.DateTimeField(
-        null=True,
-        blank=True,
-        help_text='Fecha y hora de salida de la sala'
-    )
-    notes = models.TextField(
-        blank=True,
-        help_text='Notas o comentarios sobre la entrada/salida'
-    )
-    
-    # Campos de auditoría
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    class Meta:
-        verbose_name = 'Registro de Entrada'
-        verbose_name_plural = 'Registros de Entrada'
-        ordering = ['-entry_time']
-
-    def __str__(self):
-        return f"{self.user} - {self.room} - {self.entry_time.strftime('%d/%m/%Y %H:%M')}"
     
     @property
-    def is_active(self):
-        """Indica si el monitor aún está en la sala"""
-        return self.exit_time is None
-    
-    @property
-    def duration(self):
-        """Calcula la duración de la permanencia en la sala en horas"""
+    def duration_minutes(self):
+        """Calcula la duración de la permanencia en la sala en minutos"""
         if not self.exit_time:
             return None
         
         duration = self.exit_time - self.entry_time
-        # Duración en horas (con dos decimales)
-        hours = duration.total_seconds() / 3600
-        return round(hours, 2)
+        return int(duration.total_seconds() / 60)
+    
+    def get_duration_formatted(self):
+        """Retorna la duración en formato legible (ej: '2h 30m')"""
+        if not self.duration_minutes:
+            return "En curso"
+        
+        hours = self.duration_minutes // 60
+        minutes = self.duration_minutes % 60
+        
+        if hours > 0:
+            return f"{hours}h {minutes}m"
+        return f"{minutes}m"
