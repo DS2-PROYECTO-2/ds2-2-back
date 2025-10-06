@@ -301,6 +301,13 @@ Authorization: Token <token_admin>
 POST /api/auth/admin/users/123/verify/
 Authorization: Token <token_admin>
 ```
+
+**Body:**
+```json
+{
+    "is_verified": "true",
+
+}
 **Respuesta exitosa (200):**
 ```json
 {

@@ -95,14 +95,27 @@ WSGI_APPLICATION = 'ds2_back.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
+# SQLite Configuration (comentado - backup)
+# DATABASES = {
+#     'default': {
+#         'ENGINE': 'django.db.backends.sqlite3',
+#         'NAME': BASE_DIR / 'db.sqlite3',
+#         'OPTIONS': {
+#             # Aumenta el tiempo de espera cuando hay locks (segundos)
+#             'timeout': 20,
+#         },
+#     }
+# }
+
+# PostgreSQL Configuration (ACTIVO)
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
-        'OPTIONS': {
-            # Aumenta el tiempo de espera cuando hay locks (segundos)
-            'timeout': 20,
-        },
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': env('DB_NAME'),
+        'USER': env('DB_USER'),
+        'PASSWORD': env('DB_PASSWORD'),
+        'HOST': env('DB_HOST'),
+        'PORT': env('DB_PORT'),
     }
 }
 
