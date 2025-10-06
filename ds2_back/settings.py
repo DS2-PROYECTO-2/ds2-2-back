@@ -48,6 +48,7 @@ INSTALLED_APPS = [
     'rest_framework',
     'rest_framework.authtoken',
     'corsheaders',
+    'django_crontab',
     
     # Local apps (Sprint 1)
     'users.apps.UsersConfig',
@@ -231,3 +232,87 @@ DEFAULT_FROM_EMAIL = env('DEFAULT_FROM_EMAIL', default=EMAIL_HOST_USER)
 PUBLIC_BASE_URL = "http://localhost:8000"
 # URL del frontend para enlaces de reset de contraseña
 FRONTEND_BASE_URL = "http://localhost:5173"
+
+# =============================================================================
+# CONFIGURACIÓN DE TAREAS AUTOMÁTICAS (CRONTAB)
+# =============================================================================
+
+# Tareas programadas para Tarea 2: Notificaciones automáticas
+CRONJOBS = [
+    # Verificar cumplimiento de turnos cada 15 minutos
+    ('*/15 * * * *', 'schedule.management.commands.check_schedule_compliance', {
+        'comment': 'Verificar cumplimiento de turnos y enviar notificaciones automáticas'
+    }),
+    
+    # Resumen diario a las 18:00 (solo días laborables)  
+    ('0 18 * * 1-5', 'django.core.management.call_command', ['send_daily_compliance_summary'], {
+        'comment': 'Enviar resumen diario de cumplimiento a administradores'
+    }),
+    
+    # Limpieza de notificaciones antiguas cada domingo a las 2:00 AM
+    ('0 2 * * 0', 'django.core.management.call_command', ['cleanup_old_notifications'], {
+        'comment': 'Limpiar notificaciones antiguas (más de 30 días)'
+    }),
+]
+
+# Configuración de logging para crontab
+CRONTAB_DJANGO_SETTINGS_MODULE = 'ds2_back.settings'
+CRONTAB_PYTHON_EXECUTABLE = '/usr/bin/python3'  # Ajustar según el entorno
+
+# En desarrollo, usar ruta local de Python
+import sys
+if DEBUG:
+    CRONTAB_PYTHON_EXECUTABLE = sys.executable
+
+# =============================================================================
+# CONFIGURACIÓN DE LOGGING PARA TAREAS AUTOMÁTICAS
+# =============================================================================
+
+# Logging específico para tareas de schedule
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '{levelname} {asctime} {module} {process:d} {thread:d} {message}',
+            'style': '{',
+        },
+        'simple': {
+            'format': '{levelname} {message}',
+            'style': '{',
+        },
+    },
+    'handlers': {
+        'schedule_file': {
+            'level': 'INFO',
+            'class': 'logging.handlers.RotatingFileHandler',
+            'filename': BASE_DIR / 'logs' / 'schedule_compliance.log',
+            'maxBytes': 1024*1024*5,  # 5 MB
+            'backupCount': 5,
+            'formatter': 'verbose',
+        },
+        'console': {
+            'level': 'INFO',
+            'class': 'logging.StreamHandler',
+            'formatter': 'simple',
+        },
+    },
+    'loggers': {
+        'schedule.tasks': {
+            'handlers': ['schedule_file', 'console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'schedule.management.commands': {
+            'handlers': ['schedule_file', 'console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+    },
+}
+
+# Crear directorio de logs si no existe
+import os
+logs_dir = BASE_DIR / 'logs'
+if not os.path.exists(logs_dir):
+    os.makedirs(logs_dir)

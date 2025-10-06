@@ -7,6 +7,7 @@ from rest_framework import status
 from rest_framework.authtoken.models import Token
 from datetime import timedelta
 from rooms.models import Room, RoomEntry
+from schedule.models import Schedule
 
 User = get_user_model()
 
@@ -149,6 +150,17 @@ class RoomEntryAPITest(APITestCase):
 
     def test_create_room_entry_success(self):
         """Test: Crear entrada a sala exitosamente"""
+        # Crear turno válido para el monitor
+        now = timezone.now()
+        Schedule.objects.create(
+            user=self.monitor,
+            room=self.room1,
+            start_datetime=now - timedelta(minutes=30),
+            end_datetime=now + timedelta(hours=2),
+            created_by=self.admin,
+            status=Schedule.ACTIVE
+        )
+        
         self.client.credentials(HTTP_AUTHORIZATION='Token ' + self.monitor_token.key)
         
         url = reverse('room_entry_create')

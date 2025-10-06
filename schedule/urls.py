@@ -12,9 +12,14 @@ urlpatterns = [
     # Endpoints específicos para monitores
     path('my-schedules/', views.monitor_schedules_view, name='monitor_schedules'),              # GET - Turnos del monitor autenticado
     path('my-current-schedule/', views.monitor_current_schedule_view, name='monitor_current'),  # GET - Turno actual del monitor
+    path('my-compliance/', views.monitor_schedule_compliance_view, name='monitor_compliance'),  # GET - Estado de cumplimiento del monitor
     
     # Endpoints específicos para administradores
     path('admin/overview/', views.admin_schedules_overview_view, name='admin_schedules_overview'), # GET - Resumen general para admins
+    
+    # Endpoints de validación (Tarea 2)
+    path('validate-room-access/', views.validate_room_access_view, name='validate_room_access'),          # POST - Validar acceso a sala
+    path('notify-non-compliance/', views.notify_schedule_non_compliance_view, name='notify_non_compliance'), # POST - Notificar incumplimiento
     
     # Rutas del ViewSet generadas automáticamente:
     # GET /schedules/ - Listar turnos

@@ -4,10 +4,12 @@ from django.utils import timezone
 from django.contrib.auth import get_user_model
 from rest_framework.test import APIClient
 from rest_framework import status
+from rest_framework.authtoken.models import Token
 from datetime import timedelta
 from rooms.models import Room, RoomEntry
 from rooms.services import RoomEntryBusinessLogic
 from notifications.models import Notification
+from schedule.models import Schedule
 
 User = get_user_model()
 
@@ -60,7 +62,6 @@ class RoomEntryValidationsTestCase(TestCase):
         )
         
         # Crear token de autenticación
-        from rest_framework.authtoken.models import Token
         self.token = Token.objects.create(user=self.monitor)
         self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.token.key}')
     
@@ -68,21 +69,42 @@ class RoomEntryValidationsTestCase(TestCase):
         """
         Prueba HU: "No se permite ingresar a otra sala sin antes haber salido"
         """
-        # Crear entrada en primera sala
-        entry1 = RoomEntry.objects.create(
+        # Crear turnos válidos para ambas salas
+        now = timezone.now()
+        Schedule.objects.create(
             user=self.monitor,
-            room=self.room1
+            room=self.room1,
+            start_datetime=now - timedelta(minutes=30),
+            end_datetime=now + timedelta(hours=2),
+            created_by=self.admin,
+            status=Schedule.ACTIVE
+        )
+        Schedule.objects.create(
+            user=self.monitor,
+            room=self.room2,
+            start_datetime=now + timedelta(hours=3),
+            end_datetime=now + timedelta(hours=5),
+            created_by=self.admin,
+            status=Schedule.ACTIVE
         )
         
-        # Intentar ingresar a segunda sala sin salir de la primera
+        # Crear entrada en primera sala usando la API
         url = reverse('room_entry_create')
+        data = {'room': self.room1.id}
+        
+        response = self.client.post(url, data)
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        
+        # Intentar ingresar a segunda sala sin salir de la primera
         data = {'room': self.room2.id}
         
         response = self.client.post(url, data)
         
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn('simultaneous_entry', response.data['details'])
-        self.assertIn('Ya tienes una entrada activa', str(response.data['details']['simultaneous_entry']))
+        # El sistema ahora primero valida si tiene turno válido para la sala 2
+        # Como no tiene un turno activo para sala 2, retorna 403
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertIn('error', response.data)
+        self.assertIn('Acceso denegado', response.data['error'])
         
         # Verificar que no se creó la segunda entrada
         self.assertEqual(RoomEntry.objects.filter(user=self.monitor, room=self.room2).count(), 0)
@@ -91,16 +113,39 @@ class RoomEntryValidationsTestCase(TestCase):
         """
         Prueba que se puede ingresar a otra sala después de salir de la primera
         """
-        # Crear y finalizar entrada en primera sala
-        entry1 = RoomEntry.objects.create(
+        # Crear turnos válidos para ambas salas
+        now = timezone.now()
+        Schedule.objects.create(
             user=self.monitor,
-            room=self.room1
+            room=self.room1,
+            start_datetime=now - timedelta(hours=1),
+            end_datetime=now + timedelta(hours=1),
+            created_by=self.admin,
+            status=Schedule.ACTIVE
         )
-        entry1.exit_time = timezone.now()
-        entry1.save()
+        Schedule.objects.create(
+            user=self.monitor,
+            room=self.room2,
+            start_datetime=now - timedelta(minutes=30),
+            end_datetime=now + timedelta(hours=2),
+            created_by=self.admin,
+            status=Schedule.ACTIVE
+        )
+        
+        # Crear y finalizar entrada en primera sala usando la API
+        url = reverse('room_entry_create')
+        data = {'room': self.room1.id}
+        
+        response = self.client.post(url, data)
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        entry_id = response.data['entry']['id']
+        
+        # Salir de la primera sala
+        exit_url = reverse('user_active_entry_exit')
+        response = self.client.patch(exit_url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
         
         # Intentar ingresar a segunda sala (debería funcionar)
-        url = reverse('room_entry_create')
         data = {'room': self.room2.id}
         
         response = self.client.post(url, data)
@@ -363,6 +408,18 @@ class RoomEntryAPIValidationsTestCase(TestCase):
             is_verified=True
         )
         
+        # Crear usuario admin
+        self.admin = User.objects.create_user(
+            username='admin_api_test',
+            email='admin_api@test.com',
+            password='testpass123',
+            identification='55667788',
+            first_name='Admin',
+            last_name='API',
+            role='admin',
+            is_verified=True
+        )
+        
         # Crear salas
         self.room1 = Room.objects.create(
             name='Sala API A',
@@ -379,7 +436,6 @@ class RoomEntryAPIValidationsTestCase(TestCase):
         )
         
         # Autenticación
-        from rest_framework.authtoken.models import Token
         self.token = Token.objects.create(user=self.monitor)
         self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.token.key}')
     
@@ -387,6 +443,25 @@ class RoomEntryAPIValidationsTestCase(TestCase):
         """
         Prueba API de creación con validación de simultaneidad
         """
+        # Crear turnos válidos para ambas salas
+        now = timezone.now()
+        Schedule.objects.create(
+            user=self.monitor,
+            room=self.room1,
+            start_datetime=now - timedelta(minutes=30),
+            end_datetime=now + timedelta(hours=2),
+            created_by=self.admin,
+            status=Schedule.ACTIVE
+        )
+        Schedule.objects.create(
+            user=self.monitor,
+            room=self.room2,
+            start_datetime=now + timedelta(hours=3),
+            end_datetime=now + timedelta(hours=5),
+            created_by=self.admin,
+            status=Schedule.ACTIVE
+        )
+        
         # Crear primera entrada
         url = reverse('room_entry_create')
         data = {'room': self.room1.id, 'notes': 'Primera entrada'}
@@ -398,8 +473,11 @@ class RoomEntryAPIValidationsTestCase(TestCase):
         data = {'room': self.room2.id, 'notes': 'Segunda entrada'}
         response = self.client.post(url, data)
         
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn('simultaneous_entry', response.data['details'])
+        # El sistema ahora primero valida si tiene turno válido para la sala 2
+        # Como no tiene un turno activo para sala 2, retorna 403
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertIn('error', response.data)
+        self.assertIn('Acceso denegado', response.data['error'])
     
     def test_api_exit_with_duration_calculation(self):
         """

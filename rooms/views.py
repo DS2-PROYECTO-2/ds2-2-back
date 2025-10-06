@@ -86,6 +86,19 @@ def room_entry_create_view(request):
                 'field': 'room'
             }, status=status.HTTP_400_BAD_REQUEST)
         
+        # Validar que el usuario tenga un turno activo (Tarea 2)
+        from schedule.services import ScheduleValidationService
+        try:
+            ScheduleValidationService.validate_room_access_permission(
+                user=request.user,
+                room=room
+            )
+        except ValidationError as e:
+            return Response({
+                'error': 'Acceso denegado por falta de turno activo',
+                'validation_details': e.message_dict if hasattr(e, 'message_dict') else str(e)
+            }, status=status.HTTP_403_FORBIDDEN)
+        
         # Usar el servicio de lógica de negocio
         result = RoomEntryBusinessLogic.create_room_entry_with_validations(
             user=request.user,

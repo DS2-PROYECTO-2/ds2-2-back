@@ -1,0 +1,12 @@
+INFO 2025-10-06 14:11:05,844 tasks 26076 18204 Iniciando verificación de turnos vencidos...
+INFO 2025-10-06 14:11:06,013 tasks 26076 18204 Verificación completada: 3 turnos verificados, 4 notificaciones enviadas
+WARNING 2025-10-06 14:11:06,014 tasks 26076 18204 Se encontraron 2 turnos no conformes
+WARNING 2025-10-06 14:11:06,014 tasks 26076 18204 Notificación enviada: Turno 1 - Juan manuel en sala de literatura
+WARNING 2025-10-06 14:11:06,015 tasks 26076 18204 Notificación enviada: Turno 6 - Fernando cobo en sala de ciencias
+INFO 2025-10-06 14:11:15,126 tasks 8256 6036 Resumen diario generado: 0/5 turnos cumplidos
+INFO 2025-10-06 14:39:18,938 tasks 8500 25520 Iniciando verificación de turnos vencidos...
+INFO 2025-10-06 14:39:19,074 tasks 8500 25520 Verificación completada: 3 turnos verificados, 6 notificaciones enviadas
+WARNING 2025-10-06 14:39:19,075 tasks 8500 25520 Se encontraron 3 turnos no conformes
+WARNING 2025-10-06 14:39:19,075 tasks 8500 25520 Notificación enviada: Turno 1 - Juan manuel en sala de literatura
+WARNING 2025-10-06 14:39:19,075 tasks 8500 25520 Notificación enviada: Turno 6 - Fernando cobo en sala de ciencias
+WARNING 2025-10-06 14:39:19,076 tasks 8500 25520 Notificación enviada: Turno 7 - Diego Bedo en sala de ciencias
