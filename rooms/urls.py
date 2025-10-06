@@ -1,5 +1,5 @@
 from django.urls import path
-from . import views
+from . import views, views_admin
 
 urlpatterns = [
     # Gestión de salas (Sprint 1)
@@ -16,4 +16,8 @@ urlpatterns = [
     path('my-active-entry/', views.user_active_entry_view, name='user_active_entry'),
     path('my-active-entry/exit/', views.user_active_entry_exit_view, name='user_active_entry_exit'),
     path('my-daily-summary/', views.user_daily_summary_view, name='user_daily_summary'),
+    
+    # Endpoints para administradores
+    path('entries/', views_admin.admin_entries_list, name='admin_entries_list'),
+    path('entries/stats/', views_admin.admin_entries_stats, name='admin_entries_stats'),
 ]

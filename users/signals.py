@@ -1,6 +1,5 @@
 from django.db.models.signals import post_save
 from django.dispatch import receiver
-from django.utils import timezone
 from .models import User, ApprovalLink
 from notifications.models import Notification
 from django.core.mail import send_mail
@@ -100,6 +99,15 @@ def notify_admin_new_user_registration(sender, instance, created, **kwargs):
                 html_message=html,
                 fail_silently=True,
             )
+            
+            # Solo mostrar enlaces en consola si está en modo consola (no SMTP real)
+            if settings.EMAIL_BACKEND == 'django.core.mail.backends.console.EmailBackend':
+                print(f"\n{'='*60}")
+                print(f"ENLACES DE ACTIVACIÓN PARA: {instance.get_full_name()}")
+                print(f"{'='*60}")
+                print(f"APROBAR: {approve_url}")
+                print(f"RECHAZAR: {reject_url}")
+                print(f"{'='*60}\n")
 
 
 @receiver(post_save, sender=User)

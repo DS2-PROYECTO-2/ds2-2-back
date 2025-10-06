@@ -1,7 +1,11 @@
 from django.core.mail import send_mail
 from django.conf import settings
 
-def send_password_reset_email(user, reset_url: str) -> None:
+def send_password_reset_email(user, reset_url: str) -> str:
+    """
+    Envía email de restablecimiento de contraseña
+    En desarrollo, también devuelve el enlace para mostrar en consola
+    """
     subject = '[DS2] Restablece tu contraseña'
     text = (
         f"Hola {user.get_full_name() or user.username},\n\n"
@@ -36,3 +40,6 @@ def send_password_reset_email(user, reset_url: str) -> None:
         html_message=html,
         fail_silently=True,
     )
+    
+    # En desarrollo, devolver el enlace para mostrar en consola
+    return reset_url

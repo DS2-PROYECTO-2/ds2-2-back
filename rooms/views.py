@@ -4,13 +4,10 @@ from rest_framework.authentication import TokenAuthentication
 from rest_framework.response import Response
 from rest_framework import status
 from django.shortcuts import get_object_or_404
-from django.core.exceptions import ValidationError
 from .models import Room, RoomEntry
 from .serializers import (
     RoomSerializer, 
-    RoomEntrySerializer, 
-    RoomEntryCreateSerializer,
-    RoomEntryExitSerializer
+    RoomEntrySerializer
 )
 from .services import RoomEntryBusinessLogic
 from users.permissions import IsVerifiedUser

@@ -4,7 +4,6 @@ import secrets
 import hashlib
 from urllib.parse import quote
 from django.conf import settings
-from django.urls import reverse
 
 _SIGNER = TimestampSigner(salt="user-approval-links")
 

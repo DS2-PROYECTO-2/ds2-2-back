@@ -1,14 +1,11 @@
-from rest_framework import status, generics, permissions
+from rest_framework import status, permissions
 from rest_framework.decorators import api_view, permission_classes, authentication_classes
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.response import Response
-from django.http import HttpResponse
 from django.shortcuts import redirect
 from rest_framework.authtoken.models import Token
 from django.contrib.auth import login, logout, update_session_auth_hash
-from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
-from django.utils.decorators import method_decorator
 from .models import User
 from .serializers import (
     UserRegistrationSerializer,
@@ -19,12 +16,10 @@ from .serializers import (
     AdminUserVerificationSerializer,
     ChangePasswordSerializer
 )
-from .permissions import IsAdminUser, IsVerifiedUser, CanManageUsers
+from .permissions import IsAdminUser, IsVerifiedUser
 from django.conf import settings
-from users.utils import verify_action_token
 from .models import ApprovalLink
 import hashlib
-from django.utils import timezone
 from .serializers import PasswordResetRequestSerializer, PasswordResetConfirmSerializer
 from rest_framework.permissions import AllowAny
 from django.db import transaction
@@ -371,7 +366,16 @@ def admin_user_delete_via_token(request):
 def password_reset_request_view(request):
     serializer = PasswordResetRequestSerializer(data=request.data)
     if serializer.is_valid():
-        serializer.save()
+        result = serializer.save()
+        
+        # Solo incluir enlace si está en modo consola (no SMTP real)
+        if 'reset_url' in result:
+            return Response({
+                'message': 'Si el email existe, recibirás un enlace de restablecimiento',
+                'reset_url': result['reset_url'],
+                'note': 'Enlace de desarrollo - copia y pega en el navegador'
+            }, status=status.HTTP_200_OK)
+        
         return Response({'message': 'Si el email existe, recibirás un enlace de restablecimiento'}, status=status.HTTP_200_OK)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -385,7 +389,6 @@ def password_reset_confirm_view(request):
             return Response({'error': 'Token no proporcionado'}, status=status.HTTP_400_BAD_REQUEST)
         
         # Verificar que el token existe y es válido
-        from users.utils import hash_token
         from users.models import PasswordReset
         import hashlib
         

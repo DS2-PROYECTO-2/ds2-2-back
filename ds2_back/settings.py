@@ -1,4 +1,3 @@
-from os import getenv
 from pathlib import Path
 import environ
 
@@ -53,6 +52,7 @@ INSTALLED_APPS = [
     'users.apps.UsersConfig',
     'rooms',
     'notifications',
+    'dashboard',
     
     # Apps para sprints futuros
     'equipment',
@@ -189,16 +189,16 @@ CORS_ALLOW_CREDENTIALS = True
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
-# Email configuration (desarrollo)
-#EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+# Email configuration - ENVÍO REAL DE CORREOS
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 EMAIL_HOST = 'smtp.gmail.com'
 EMAIL_PORT = 587
 EMAIL_USE_TLS = True
 
-EMAIL_HOST_USER = env('EMAIL_HOST_USER', default='')
-EMAIL_HOST_PASSWORD = env('EMAIL_HOST_PASSWORD', default='')
-DEFAULT_FROM_EMAIL = env('DEFAULT_FROM_EMAIL', default=EMAIL_HOST_USER)
+# Configuración de email con credenciales reales
+EMAIL_HOST_USER = env('EMAIL_HOST_USER', default='sado56hdgm@gmail.com')
+EMAIL_HOST_PASSWORD = env('EMAIL_HOST_PASSWORD', default='orfl vkzn dern pbos')
+DEFAULT_FROM_EMAIL = env('DEFAULT_FROM_EMAIL', default='Soporte DS2 <sado56hdgm@gmail.com>')
 # URL pública base para construir enlaces en correos
 PUBLIC_BASE_URL = "http://localhost:8000"
 # URL del frontend para enlaces de reset de contraseña
