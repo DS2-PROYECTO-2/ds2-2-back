@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [ main, develop]
   pull_request:
     branches: [ main, develop ]
 
@@ -45,4 +45,3 @@ jobs:
           DJANGO_SETTINGS_MODULE: ds2_back.settings
         run: |
           python manage.py test --verbosity 2
-

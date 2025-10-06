@@ -1,3 +1,7 @@
+from pathlib import Path
+import environ
+import sys
+
 """
 Django settings for ds2_back project.
 
@@ -10,22 +14,24 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
-from pathlib import Path
+
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+env = environ.Env()
+environ.Env.read_env(BASE_DIR / '.env')  # Carga el .env de la raíz del proyecto
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-+94#n(t43qmkej469gizg$f5y@#l&wq03s(++c86bddkn91iwc'
+SECRET_KEY = 'django-insecure-oqquaff+@v#nz5%0ujbfzn0k7z=&%^&&zgnz#x9^203qc-ej_!'
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['127.0.0.1', 'localhost', 'testserver']
 
 
 # Application definition
@@ -37,9 +43,27 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    
+    # Third party apps
+    'rest_framework',
+    'rest_framework.authtoken',
+    'corsheaders',
+    
+    # Local apps (Sprint 1)
+    'users.apps.UsersConfig',
+    'rooms',
+    'notifications',
+    'dashboard',
+    
+    # Apps para sprints futuros
+    'equipment',
+    'attendance',
+    'schedule',
+    'reports',
 ]
 
 MIDDLEWARE = [
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -72,12 +96,56 @@ WSGI_APPLICATION = 'ds2_back.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+# Estrategia de selección de base de datos:
+# 1) Tests: SQLite en memoria
+# 2) Si existe DATABASE_URL en .env -> usarla (soporta sqlite/postgres)
+# 3) Si hay variables DB_* -> usar PostgreSQL
+# 4) Fallback: SQLite en archivo
+if 'test' in sys.argv or 'pytest' in sys.modules:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': ':memory:',
+            'OPTIONS': {'timeout': 20},
+        }
     }
-}
+else:
+    database_url = env.str('DATABASE_URL', default='')
+    if database_url:
+        DATABASES = {
+            'default': env.db(),
+        }
+    elif env.str('DB_NAME', default=''):
+        DATABASES = {
+            'default': {
+                'ENGINE': 'django.db.backends.postgresql',
+                'NAME': env('DB_NAME'),
+                'USER': env('DB_USER', default='postgres'),
+                'PASSWORD': env('DB_PASSWORD', default=''),
+                'HOST': env('DB_HOST', default='127.0.0.1'),
+                'PORT': env('DB_PORT', default='5432'),
+            }
+        }
+    else:
+        DATABASES = {
+            'default': {
+                'ENGINE': 'django.db.backends.sqlite3',
+                'NAME': BASE_DIR / 'db.sqlite3',
+                'OPTIONS': {'timeout': 20},
+            }
+        }
+
+# SQLite Configuration (backup para desarrollo local si es necesario)
+# DATABASES = {
+#     'default': {
+#         'ENGINE': 'django.db.backends.sqlite3',
+#         'NAME': BASE_DIR / 'db.sqlite3',
+#         'OPTIONS': {
+#             # Aumenta el tiempo de espera cuando hay locks (segundos)
+#             'timeout': 20,
+#         },
+#     }
+# }
 
 
 # Password validation
@@ -102,9 +170,9 @@ AUTH_PASSWORD_VALIDATORS = [
 # Internationalization
 # https://docs.djangoproject.com/en/5.2/topics/i18n/
 
-LANGUAGE_CODE = 'en-us'
+LANGUAGE_CODE = 'es-co'
 
-TIME_ZONE = 'UTC'
+TIME_ZONE = 'America/Bogota'
 
 USE_I18N = True
 
@@ -120,3 +188,59 @@ STATIC_URL = 'static/'
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# Custom User Model
+AUTH_USER_MODEL = 'users.User'
+
+# Django REST Framework Configuration
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework.authentication.TokenAuthentication',
+        'rest_framework.authentication.SessionAuthentication',
+    ],
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.IsAuthenticated',
+    ],
+    'DEFAULT_RENDERER_CLASSES': [
+        'rest_framework.renderers.JSONRenderer',
+    ],
+    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
+    'PAGE_SIZE': 20
+}
+
+# Deshabilitar CSRF para desarrollo (solo para APIs)
+if DEBUG:
+    REST_FRAMEWORK['DEFAULT_AUTHENTICATION_CLASSES'] = [
+        'rest_framework.authentication.TokenAuthentication',
+    ]
+
+# CORS Configuration
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:3000",  # React development server
+    "http://127.0.0.1:3000",
+    "http://localhost:4200",  # Angular development server
+    "http://127.0.0.1:4200",
+    "http://localhost:5173",  # Vite/React
+    "http://127.0.0.1:5173",
+]
+
+CORS_ALLOW_CREDENTIALS = True
+
+# Media files configuration
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'
+
+# Email configuration - ENVÍO REAL DE CORREOS
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = 'smtp.gmail.com'
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+
+# Configuración de email con credenciales reales
+EMAIL_HOST_USER = env('EMAIL_HOST_USER', default='sado56hdgm@gmail.com')
+EMAIL_HOST_PASSWORD = env('EMAIL_HOST_PASSWORD', default='orfl vkzn dern pbos')
+DEFAULT_FROM_EMAIL = env('DEFAULT_FROM_EMAIL', default='Soporte DS2 <sado56hdgm@gmail.com>')
+# URL pública base para construir enlaces en correos
+PUBLIC_BASE_URL = "http://localhost:8000"
+# URL del frontend para enlaces de reset de contraseña
+FRONTEND_BASE_URL = "http://localhost:5173"
