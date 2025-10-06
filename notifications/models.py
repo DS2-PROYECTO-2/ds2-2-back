@@ -13,6 +13,7 @@ class Notification(models.Model):
     EQUIPMENT_REPORT = 'equipment_report'
     ATTENDANCE = 'attendance'
     ADMIN_VERIFICATION = 'admin_verification'
+    EXCESSIVE_HOURS = 'excessive_hours'
     
     TYPE_CHOICES = [
         (ROOM_ENTRY, 'Entrada a sala'),
@@ -21,12 +22,13 @@ class Notification(models.Model):
         (EQUIPMENT_REPORT, 'Reporte de equipo'),
         (ATTENDANCE, 'Listado de asistencia'),
         (ADMIN_VERIFICATION, 'Verificación de usuario'),
+        (EXCESSIVE_HOURS, 'Exceso de horas continuas'),
     ]
     
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
-        related_name='notifications',
+        related_name='notifications_received',
         help_text='Usuario que recibe la notificación'
     )
     notification_type = models.CharField(

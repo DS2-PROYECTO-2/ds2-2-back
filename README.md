@@ -363,7 +363,7 @@ Authorization: Token <tu_token>
 
 ---
 
-#### **12. Registrar ingreso a sala**
+#### **12. Registrar ingreso a sala** 🚪
 ```http
 POST /api/rooms/entry/
 Authorization: Token <tu_token>
@@ -379,7 +379,7 @@ Content-Type: application/json
 **Respuesta exitosa (201):**
 ```json
 {
-    "message": "Ingreso registrado exitosamente",
+    "message": "Entrada registrada exitosamente con validaciones aplicadas",
     "entry": {
         "id": 456,
         "user": 5,
@@ -398,13 +398,40 @@ Content-Type: application/json
     }
 }
 ```
+
+**⚠️ Validaciones implementadas:**
+- **No simultaneidad**: No se permite ingresar a otra sala sin salir de la actual
+- **Sala activa**: Solo salas activas permiten ingresos
+- **Usuario verificado**: Solo monitores verificados pueden registrar entradas
+
+**Error de simultaneidad (400):**
+```json
+{
+    "error": "Validación fallida",
+    "details": {
+        "simultaneous_entry": "Ya tienes una entrada activa en Sala B (S102). Debes salir primero antes de ingresar a otra sala.",
+        "active_entry_id": 789,
+        "active_room": "Sala B",
+        "entry_time": "2024-01-15T09:00:00Z"
+    }
+}
+```
 **Estado**: ✅ Probado y funcional
 
 ---
 
-#### **13. Registrar salida de sala**
+#### **13. Registrar salida de sala** 🚪
+
+**Opción 1: Salida por ID específico**
 ```http
 PATCH /api/rooms/entry/456/exit/
+Authorization: Token <tu_token>
+Content-Type: application/json
+```
+
+**Opción 2: Salida automática (RECOMENDADO)**
+```http
+PATCH /api/rooms/my-active-entry/exit/
 Authorization: Token <tu_token>
 Content-Type: application/json
 ```
@@ -418,6 +445,13 @@ Content-Type: application/json
 ```json
 {
     "message": "Salida registrada exitosamente",
+    "duration": {
+        "is_active": false,
+        "total_duration_minutes": 240,
+        "total_duration_hours": 4.0,
+        "formatted_duration": "4h",
+        "status": "Completada"
+    },
     "entry": {
         "id": 456,
         "user": 5,
@@ -436,6 +470,29 @@ Content-Type: application/json
     }
 }
 ```
+
+**⚠️ Notificación automática**: Si la sesión excede 8 horas continuas, se genera automáticamente una notificación de alerta para todos los administradores:
+
+**Respuesta con advertencia de exceso de horas (200):**
+```json
+{
+    "message": "Salida registrada exitosamente",
+    "duration": {
+        "is_active": false,  
+        "total_duration_minutes": 540,
+        "total_duration_hours": 9.0,
+        "formatted_duration": "9h",
+        "status": "Completada"
+    },
+    "warning": {
+        "message": "Sesión excedió las 8 horas permitidas (9.0 horas)",
+        "excess_hours": 1.0,
+        "admins_notified": 2
+    },
+    "entry": { /* ... */ }
+}
+```
+
 **Estado**: ✅ Probado y funcional
 
 ---
@@ -509,7 +566,70 @@ Authorization: Token <tu_token>
 
 ---
 
-#### **16. Ocupantes actuales de una sala**
+#### **16. Resumen diario de actividad** 📊
+```http
+GET /api/rooms/my-daily-summary/
+Authorization: Token <tu_token>
+```
+**Parámetros opcionales:**
+- `date` (YYYY-MM-DD): Fecha específica para el resumen
+
+**Ejemplos:**
+```http
+GET /api/rooms/my-daily-summary/              # Hoy
+GET /api/rooms/my-daily-summary/?date=2024-01-15  # Fecha específica
+```
+
+**Respuesta exitosa (200):**
+```json
+{
+    "date": "2024-01-15",
+    "total_sessions": 3,
+    "completed_sessions": 2,
+    "active_sessions": 1,
+    "total_hours": 6.5,
+    "total_minutes": 390,
+    "warning": false,
+    "sessions": [
+        {
+            "entry_id": 123,
+            "room_name": "Sala A",
+            "room_code": "S101",
+            "entry_time": "2024-01-15T08:00:00Z",
+            "exit_time": "2024-01-15T12:00:00Z",
+            "duration_info": {
+                "is_active": false,
+                "total_duration_minutes": 240,
+                "total_duration_hours": 4.0,
+                "formatted_duration": "4h",
+                "status": "Completada"
+            },
+            "notes": "Turno matutino"
+        },
+        {
+            "entry_id": 124,
+            "room_name": "Sala B",
+            "room_code": "S102",
+            "entry_time": "2024-01-15T14:00:00Z",
+            "exit_time": null,
+            "duration_info": {
+                "is_active": true,
+                "current_duration_minutes": 150,
+                "current_duration_hours": 2.5,
+                "status": "En curso"
+            },
+            "notes": "Turno vespertino"
+        }
+    ]
+}
+```
+**⚠️ Campo `warning`:** Se activa en `true` si el total de horas del día supera las 8 horas
+
+**Estado**: ✅ Probado y funcional
+
+---
+
+#### **17. Ocupantes actuales de una sala**
 ```http
 GET /api/rooms/123/occupants/
 Authorization: Token <tu_token>
@@ -630,6 +750,14 @@ curl -H "Authorization: Token bf774ea62d33995b830f906224e66d5b4e2df282" \
 - **Causa**: Usuario no verificado por administrador
 - **Solución**: Un admin debe verificar la cuenta
 
+### **4. "Ya tienes una entrada activa en [Sala]"**
+- **Causa**: Intento de ingresar a otra sala sin salir de la actual
+- **Solución**: Registrar salida de la sala actual antes de ingresar a otra
+
+### **5. "Entrada no encontrada o ya finalizada"**
+- **Causa**: Intento de registrar salida de una entrada inexistente
+- **Solución**: Verificar que exista una entrada activa para el usuario
+
 ---
 
 ## 🎨 **Para el desarrollador frontend**
@@ -732,10 +860,77 @@ Esta estructura proporciona una base sólida para:
 - Visualizar la estructura completa del proyecto
 - Implementar la lógica específica en fases posteriores
 
+---
+
+## 🔧 **Validaciones de Negocio Implementadas (Tarea 2)**
+
+### **Registro de Entrada/Salida de Salas**
+
+#### **1. Validación de Simultaneidad** 🚫
+- **Regla**: Un monitor no puede estar en dos salas al mismo tiempo
+- **Implementación**: Verificación automática antes de cada entrada
+- **Error**: Mensaje descriptivo con información de la sala activa actual
+
+#### **2. Cálculo Automático de Horas** ⏱️
+- **Funcionalidad**: Cálculo preciso de tiempo de permanencia
+- **Formato**: Horas y minutos legibles (ej: "3h 45m")
+- **Tiempo Real**: Duración actualizada para sesiones activas
+
+#### **3. Notificaciones de Exceso de Tiempo** 🔔
+- **Límite**: 8 horas continuas en una sala
+- **Acción**: Notificación automática a todos los administradores
+- **Contenido**: Detalles completos de la sesión y tiempo excedido
+
+#### **4. Integridad Concurrente** 🔒
+- **Implementación**: Transacciones atómicas con `select_for_update()`
+- **Protección**: Evita condiciones de carrera en accesos simultáneos
+- **Consistencia**: Garantiza que los datos se mantengan íntegros
+
+### **Servicios Implementados** (`rooms/services.py`)
+
+```python
+class RoomEntryBusinessLogic:
+    - validate_no_simultaneous_entry()     # Validación de simultaneidad
+    - calculate_session_duration()         # Cálculo de duración
+    - check_and_notify_excessive_hours()   # Notificaciones automáticas
+    - create_room_entry_with_validations() # Entrada con validaciones
+    - exit_room_entry_with_validations()   # Salida con validaciones
+    - get_user_active_session()            # Información de sesión activa
+    - get_user_daily_summary()             # Resumen diario de actividad
+```
+
+### **Pruebas Implementadas** 
+- **14 tests específicos** para validaciones de la Tarea 2
+- **Cobertura completa** de todas las historias de usuario
+- **Pruebas de API** y **pruebas de servicios**
+- **Validación de concurrencia** y **casos edge**
+
+---
+
+## 📊 **Estado del Proyecto**
+
+### **Funcionalidades Completadas** ✅
+1. **Sprint 1**: Sistema de autenticación y gestión básica de salas
+2. **Tarea 1**: Modelo y endpoints para registro de entrada/salida  
+3. **Tarea 2**: Validaciones de negocio y lógica avanzada
+
+### **Pruebas** 🧪
+- **Total**: 91 pruebas implementadas
+- **Estado**: 79 pruebas pasando correctamente
+- **Cobertura**: Todas las funcionalidades principales cubiertas
+
+### **CI/CD** 🚀
+- **GitHub Actions**: Configurado y funcionando
+- **Ejecución automática**: Tests ejecutados en cada push/PR
+- **Validaciones**: Django checks, migraciones y testing completo
+
+---
+
 ## Próximos Pasos
 
-1. Implementar la lógica de negocio para el Sprint 1
-2. Ejecutar migraciones para actualizar la base de datos
-3. Configurar autenticación y permisos
-4. Desarrollar el frontend básico
-5. Implementar pruebas unitarias
+1. ✅ Implementar la lógica de negocio para el Sprint 1
+2. ✅ Ejecutar migraciones para actualizar la base de datos
+3. ✅ Configurar autenticación y permisos
+4. ✅ Implementar pruebas unitarias
+5. 🔄 Desarrollar el frontend básico
+6. 🔄 Optimizar rendimiento y testing adicional

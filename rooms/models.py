@@ -1,5 +1,6 @@
 from django.db import models
 from django.conf import settings
+from django.utils import timezone
 
 
 class Room(models.Model):
@@ -57,7 +58,7 @@ class RoomEntry(models.Model):
         help_text='Sala a la que ingresa el monitor'
     )
     entry_time = models.DateTimeField(
-        auto_now_add=True,
+        default=timezone.now,
         help_text='Fecha y hora de entrada a la sala'
     )
     exit_time = models.DateTimeField(
