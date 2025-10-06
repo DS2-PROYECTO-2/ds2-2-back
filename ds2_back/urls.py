@@ -22,4 +22,5 @@ urlpatterns = [
     path('api/auth/', include('users.urls')),                  # * - Autenticación y gestión de usuarios
     path('api/rooms/', include('rooms.urls')),                 # * - Gestión de salas y entradas/salidas
     path('api/notifications/', include('notifications.urls')), # * - Sistema de notificaciones
+    path('api/schedule/', include('schedule.urls')),           # * - Gestión de turnos y calendarios
 ]
