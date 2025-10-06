@@ -1,7 +1,5 @@
 from rest_framework import serializers
-from django.contrib.auth import authenticate
 from django.utils import timezone
-from .models import User
 from .utils import generate_raw_token, hash_token, build_password_reset_url
 from datetime import timedelta
 from django.contrib.auth import get_user_model
@@ -269,6 +267,11 @@ class PasswordResetRequestSerializer(serializers.Serializer):
 
         reset_url = build_password_reset_url(raw_token)
         send_password_reset_email(user, reset_url)
+        
+        # Solo devolver enlace si está en modo consola (no SMTP real)
+        from django.conf import settings
+        if settings.EMAIL_BACKEND == 'django.core.mail.backends.console.EmailBackend':
+            return {'reset_url': reset_url}
         return {}
 
 class PasswordResetConfirmSerializer(serializers.Serializer):
