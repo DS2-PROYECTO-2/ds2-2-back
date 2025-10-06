@@ -64,7 +64,14 @@ jobs:
         python manage.py shell -c "
         from users.models import User;
         if not User.objects.filter(username='test_admin').exists():
-            User.objects.create_superuser('test_admin', 'admin@test.com', 'test123', role='admin', is_verified=True)
+            User.objects.create_superuser(
+                identification='test_admin_id',
+                username='test_admin',
+                email='admin@test.com',
+                password='test123',
+                role='admin',
+                is_verified=True
+            )
         "
       env:
         DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_ds2_back_db
