@@ -102,11 +102,24 @@ jobs:
         python -m py_compile schedule/services.py
         python -m py_compile schedule/views.py
         python -c "
+        import django
+        import os
+        os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'ds2_back.settings')
+        django.setup()
         import schedule.services
         import schedule.views
         from schedule.services import ScheduleValidationService, ScheduleComplianceMonitor
         print('✅ All imports working correctly')
         "
+      env:
+        SECRET_KEY: test-secret-key-for-github-actions
+        DEBUG: True
+        DB_NAME: test_ds2_back_db
+        DB_USER: postgres
+        DB_PASSWORD: postgres
+        DB_HOST: localhost
+        DB_PORT: 5432
+        DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_ds2_back_db
 
     - name: Test API endpoints with curl (Integration Test)
       run: |
