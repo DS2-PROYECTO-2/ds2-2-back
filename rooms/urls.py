@@ -17,7 +17,14 @@ urlpatterns = [
     path('my-active-entry/exit/', views.user_active_entry_exit_view, name='user_active_entry_exit'),
     path('my-daily-summary/', views.user_daily_summary_view, name='user_daily_summary'),
     
-    # Endpoints para administradores
+    # Endpoints para administradores (nombres esperados por tests)
+    path('admin/rooms/', views_admin.admin_rooms_list, name='admin_rooms_list'),
+    path('admin/rooms/create/', views_admin.admin_room_create, name='admin_room_create'),
+    path('admin/rooms/<int:room_id>/', views_admin.admin_room_detail, name='admin_room_detail'),
+    path('admin/rooms/<int:room_id>/update/', views_admin.admin_room_update, name='admin_room_update'),
+    path('admin/rooms/<int:room_id>/delete/', views_admin.admin_room_delete, name='admin_room_delete'),
+
+    # Endpoints admin adicionales
     path('entries/', views_admin.admin_entries_list, name='admin_entries_list'),
     path('entries/stats/', views_admin.admin_entries_stats, name='admin_entries_stats'),
 ]
