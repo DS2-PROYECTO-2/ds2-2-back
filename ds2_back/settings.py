@@ -95,16 +95,44 @@ WSGI_APPLICATION = 'ds2_back.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
-        'OPTIONS': {
-            # Aumenta el tiempo de espera cuando hay locks (segundos)
-            'timeout': 20,
-        },
+import sys
+
+# Configuración condicional de base de datos
+if 'test' in sys.argv or 'pytest' in sys.modules:
+    # SQLite para tests (más rápido y no requiere servidor PostgreSQL)
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': ':memory:',  # Base de datos en memoria para tests más rápidos
+            'OPTIONS': {
+                'timeout': 20,
+            },
+        }
     }
-}
+else:
+    # PostgreSQL para desarrollo y producción
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': env('DB_NAME'),
+            'USER': env('DB_USER'),
+            'PASSWORD': env('DB_PASSWORD'),
+            'HOST': env('DB_HOST'),
+            'PORT': env('DB_PORT'),
+        }
+    }
+
+# SQLite Configuration (backup para desarrollo local si es necesario)
+# DATABASES = {
+#     'default': {
+#         'ENGINE': 'django.db.backends.sqlite3',
+#         'NAME': BASE_DIR / 'db.sqlite3',
+#         'OPTIONS': {
+#             # Aumenta el tiempo de espera cuando hay locks (segundos)
+#             'timeout': 20,
+#         },
+#     }
+# }
 
 
 # Password validation

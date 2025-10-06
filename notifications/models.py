@@ -14,6 +14,7 @@ class Notification(models.Model):
     ATTENDANCE = 'attendance'
     ADMIN_VERIFICATION = 'admin_verification'
     EXCESSIVE_HOURS = 'excessive_hours'
+    CONVERSATION_MESSAGE = 'conversation_message'
     
     TYPE_CHOICES = [
         (ROOM_ENTRY, 'Entrada a sala'),
@@ -23,6 +24,7 @@ class Notification(models.Model):
         (ATTENDANCE, 'Listado de asistencia'),
         (ADMIN_VERIFICATION, 'Verificación de usuario'),
         (EXCESSIVE_HOURS, 'Exceso de horas continuas'),
+        (CONVERSATION_MESSAGE, 'Nuevo mensaje en conversación'),
     ]
     
     user = models.ForeignKey(
