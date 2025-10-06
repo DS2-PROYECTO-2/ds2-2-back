@@ -7,13 +7,58 @@ class RoomSerializer(serializers.ModelSerializer):
     """
     Serializador para el modelo de Sala (Sprint 1)
     """
+    occupants_count = serializers.SerializerMethodField()
+    
     class Meta:
         model = Room
         fields = [
             'id', 'name', 'code', 'capacity', 'description', 
-            'is_active', 'created_at', 'updated_at'
+            'is_active', 'created_at', 'updated_at', 'occupants_count'
         ]
         read_only_fields = ['id', 'created_at', 'updated_at']
+    
+    def get_occupants_count(self, obj):
+        """Número actual de ocupantes en la sala"""
+        return RoomEntry.objects.filter(room=obj, exit_time__isnull=True).count()
+
+
+class RoomCreateUpdateSerializer(serializers.ModelSerializer):
+    """
+    Serializador específico para crear/actualizar salas - solo administradores
+    """
+    
+    class Meta:
+        model = Room
+        fields = ['name', 'code', 'capacity', 'description', 'is_active']
+    
+    def validate_name(self, value):
+        """Validar que el nombre de la sala sea único"""
+        # En actualización, excluir la instancia actual
+        if self.instance:
+            if Room.objects.filter(name=value).exclude(id=self.instance.id).exists():
+                raise serializers.ValidationError("Ya existe una sala con este nombre.")
+        else:
+            if Room.objects.filter(name=value).exists():
+                raise serializers.ValidationError("Ya existe una sala con este nombre.")
+        return value
+    
+    def validate_code(self, value):
+        """Validar que el código de la sala sea único"""
+        if self.instance:
+            if Room.objects.filter(code=value).exclude(id=self.instance.id).exists():
+                raise serializers.ValidationError("Ya existe una sala con este código.")
+        else:
+            if Room.objects.filter(code=value).exists():
+                raise serializers.ValidationError("Ya existe una sala con este código.")
+        return value
+    
+    def validate_capacity(self, value):
+        """Validar que la capacidad sea válida"""
+        if value < 1:
+            raise serializers.ValidationError("La capacidad debe ser mayor a 0.")
+        if value > 1000:
+            raise serializers.ValidationError("La capacidad no puede ser mayor a 1000.")
+        return value
 
 
 class RoomEntrySerializer(serializers.ModelSerializer):

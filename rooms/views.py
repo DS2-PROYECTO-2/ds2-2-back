@@ -10,10 +10,15 @@ from .serializers import (
     RoomSerializer, 
     RoomEntrySerializer, 
     RoomEntryCreateSerializer,
-    RoomEntryExitSerializer
+    RoomEntryExitSerializer,
+    RoomCreateUpdateSerializer
 )
 from .services import RoomEntryBusinessLogic
+from .permissions import IsAdminUser
 from users.permissions import IsVerifiedUser
+from django.db import transaction
+from django.db import models
+from django.utils import timezone
 
 
 # ========== VISTAS DE SALAS (Sprint 1) ==========
@@ -322,3 +327,240 @@ def room_current_occupants_view(request, room_id):
         'current_occupants': active_entries.count(),
         'entries': serializer.data
     }, status=status.HTTP_200_OK)
+
+
+# ========== VISTAS DE ADMINISTRACIÓN DE SALAS (SOLO ADMINS) ==========
+
+@api_view(['POST'])
+@authentication_classes([TokenAuthentication])
+@permission_classes([IsAdminUser])
+def admin_room_create_view(request):
+    """
+    Crear una nueva sala - Solo administradores
+    """
+    try:
+        serializer = RoomCreateUpdateSerializer(data=request.data)
+        
+        if serializer.is_valid():
+            with transaction.atomic():
+                room = serializer.save()
+                response_serializer = RoomSerializer(room)
+                return Response({
+                    'message': 'Sala creada exitosamente',
+                    'room': response_serializer.data
+                }, status=status.HTTP_201_CREATED)
+        
+        return Response({
+            'error': 'Datos inválidos para crear la sala',
+            'details': serializer.errors
+        }, status=status.HTTP_400_BAD_REQUEST)
+        
+    except Exception as e:
+        return Response({
+            'error': 'Error interno del servidor',
+            'details': str(e)
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['PUT', 'PATCH'])
+@authentication_classes([TokenAuthentication])
+@permission_classes([IsAdminUser])
+def admin_room_update_view(request, room_id):
+    """
+    Actualizar una sala existente - Solo administradores
+    """
+    try:
+        room = get_object_or_404(Room, id=room_id)
+        
+        # Verificar si la sala tiene ocupantes activos antes de permitir ciertos cambios
+        active_occupants = RoomEntry.objects.filter(room=room, exit_time__isnull=True).count()
+        
+        if active_occupants > 0 and 'is_active' in request.data and not request.data['is_active']:
+            return Response({
+                'error': 'No se puede desactivar una sala con ocupantes activos',
+                'details': f'La sala tiene {active_occupants} ocupantes actualmente.',
+                'active_occupants': active_occupants
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        partial = request.method == 'PATCH'
+        serializer = RoomCreateUpdateSerializer(room, data=request.data, partial=partial)
+        
+        if serializer.is_valid():
+            with transaction.atomic():
+                updated_room = serializer.save()
+                response_serializer = RoomSerializer(updated_room)
+                return Response({
+                    'message': 'Sala actualizada exitosamente',
+                    'room': response_serializer.data
+                })
+        
+        return Response({
+            'error': 'Datos inválidos para actualizar la sala',
+            'details': serializer.errors
+        }, status=status.HTTP_400_BAD_REQUEST)
+        
+    except Exception as e:
+        return Response({
+            'error': 'Error interno del servidor',
+            'details': str(e)
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['DELETE'])
+@authentication_classes([TokenAuthentication])
+@permission_classes([IsAdminUser])
+def admin_room_delete_view(request, room_id):
+    """
+    Eliminar una sala - Solo administradores
+    Soft delete: marca como inactiva en lugar de eliminar físicamente si tiene historial
+    """
+    try:
+        room = get_object_or_404(Room, id=room_id)
+        
+        # Verificar si la sala tiene ocupantes activos
+        active_occupants = RoomEntry.objects.filter(room=room, exit_time__isnull=True).count()
+        
+        if active_occupants > 0:
+            return Response({
+                'error': 'No se puede eliminar una sala con ocupantes activos',
+                'details': f'La sala tiene {active_occupants} ocupantes actualmente. Debe esperar a que salgan antes de eliminarla.',
+                'active_occupants': active_occupants
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Verificar si la sala tiene historial de entradas
+        total_entries = RoomEntry.objects.filter(room=room).count()
+        
+        if total_entries > 0:
+            # Soft delete: marcar como inactiva
+            with transaction.atomic():
+                room.is_active = False
+                room.name = f"{room.name} (ELIMINADA)"
+                room.save()
+            
+            return Response({
+                'message': 'Sala marcada como eliminada exitosamente',
+                'details': f'La sala tenía {total_entries} registros históricos, por lo que se marcó como inactiva en lugar de eliminarla físicamente.',
+                'action': 'soft_delete',
+                'room': {
+                    'id': room.id,
+                    'name': room.name,
+                    'is_active': room.is_active
+                }
+            })
+        else:
+            # Hard delete: eliminar físicamente si no tiene historial
+            room_info = {
+                'id': room.id,
+                'name': room.name,
+                'code': room.code
+            }
+            room.delete()
+            
+            return Response({
+                'message': 'Sala eliminada completamente',
+                'details': 'La sala no tenía registros históricos, por lo que se eliminó completamente.',
+                'action': 'hard_delete',
+                'deleted_room': room_info
+            })
+            
+    except Exception as e:
+        return Response({
+            'error': 'Error interno del servidor',
+            'details': str(e)
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['GET'])
+@authentication_classes([TokenAuthentication])
+@permission_classes([IsAdminUser])
+def admin_rooms_list_view(request):
+    """
+    Lista todas las salas (incluyendo inactivas opcionalmente) - Solo administradores
+    """
+    try:
+        # Parámetros de filtrado
+        include_inactive = request.GET.get('include_inactive', 'false').lower() == 'true'
+        search = request.GET.get('search', '')
+        
+        # Query base
+        rooms = Room.objects.all()
+        
+        # Filtros
+        if not include_inactive:
+            rooms = rooms.filter(is_active=True)
+        
+        if search:
+            rooms = rooms.filter(
+                models.Q(name__icontains=search) | 
+                models.Q(code__icontains=search) |
+                models.Q(description__icontains=search)
+            )
+        
+        # Ordenar por fecha de creación (más recientes primero)
+        rooms = rooms.order_by('-created_at')
+        
+        serializer = RoomSerializer(rooms, many=True)
+        
+        return Response({
+            'count': rooms.count(),
+            'include_inactive': include_inactive,
+            'search': search if search else None,
+            'rooms': serializer.data
+        })
+        
+    except Exception as e:
+        return Response({
+            'error': 'Error interno del servidor',
+            'details': str(e)
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['GET'])
+@authentication_classes([TokenAuthentication])
+@permission_classes([IsAdminUser])
+def admin_room_detail_view(request, room_id):
+    """
+    Detalle completo de una sala con estadísticas - Solo administradores
+    """
+    try:
+        room = get_object_or_404(Room, id=room_id)
+        
+        # Información adicional para administradores
+        active_entries = RoomEntry.objects.filter(room=room, exit_time__isnull=True).select_related('user')
+        total_entries = RoomEntry.objects.filter(room=room).count()
+        
+        # Calcular horas totales de uso de la sala
+        completed_entries = RoomEntry.objects.filter(room=room, exit_time__isnull=False)
+        total_minutes = 0
+        for entry in completed_entries:
+            duration = entry.exit_time - entry.entry_time
+            total_minutes += duration.total_seconds() / 60
+        
+        total_hours_calculated = round(total_minutes / 60, 2) if total_minutes > 0 else 0
+        
+        serializer = RoomSerializer(room)
+        
+        return Response({
+            'room': serializer.data,
+            'statistics': {
+                'current_occupants': active_entries.count(),
+                'total_entries_historical': total_entries,
+                'total_hours_usage': total_hours_calculated,
+                'active_entries': [
+                    {
+                        'id': entry.id,
+                        'user_username': entry.user.username,
+                        'user_full_name': entry.user.get_full_name(),
+                        'entry_time': entry.entry_time,
+                        'duration_minutes': round((timezone.now() - entry.entry_time).total_seconds() / 60, 2)
+                    }
+                    for entry in active_entries
+                ]
+            }
+        })
+        
+    except Exception as e:
+        return Response({
+            'error': 'Error interno del servidor',
+            'details': str(e)
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

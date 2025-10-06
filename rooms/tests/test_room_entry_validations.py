@@ -455,13 +455,17 @@ class RoomEntryAPIValidationsTestCase(TestCase):
         """
         today = timezone.now().date()
         
-        # Crear entradas de prueba
-        base_time = timezone.now() - timedelta(hours=4)
-        RoomEntry.objects.create(
+        # Crear entradas de prueba usando hora específica del día actual
+        from datetime import datetime, time
+        base_datetime = datetime.combine(today, time(10, 0))  # 10:00 AM de hoy
+        base_time = timezone.make_aware(base_datetime)
+        
+        # Crear entrada directamente con los valores correctos
+        entry = RoomEntry.objects.create(
             user=self.monitor,
             room=self.room1,
             entry_time=base_time,
-            exit_time=base_time + timedelta(hours=2)
+            exit_time=base_time + timedelta(hours=2)  # 12:00 PM - 2 horas
         )
         
         # Obtener resumen
