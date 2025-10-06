@@ -70,10 +70,6 @@ class RoomEntry(models.Model):
         blank=True,
         help_text='Notas o comentarios sobre la entrada/salida'
     )
-    active = models.BooleanField(
-        default=True,
-        help_text='Indica si la entrada está activa'
-    )
     
     # Campos de auditoría
     created_at = models.DateTimeField(auto_now_add=True)

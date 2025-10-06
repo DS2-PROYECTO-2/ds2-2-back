@@ -1,7 +1,7 @@
 from rest_framework import viewsets, permissions
 from .models import Attendance, Incapacity
 from .serializers import AttendanceSerializer, IncapacitySerializer
-
+from users.views import IsAdminUser
 
 
 class AttendanceViewSet(viewsets.ModelViewSet):

@@ -1,7 +1,10 @@
 from django.utils import timezone
+from django.db import transaction
 from django.core.exceptions import ValidationError
+from datetime import timedelta
 from .models import RoomEntry
-from notifications.services import NotificationService
+from notifications.models import Notification
+from users.models import User
 
 
 class RoomEntryBusinessLogic:
@@ -18,7 +21,6 @@ class RoomEntryBusinessLogic:
         """
         active_entry = RoomEntry.objects.filter(
             user=user,
-            active=True,
             exit_time__isnull=True
         ).select_related('room').first()
         
@@ -80,26 +82,58 @@ class RoomEntryBusinessLogic:
         Generar notificación automática al admin si un monitor excede 8 horas continuas.
         HU: "Si un monitor excede 8 horas seguidas, se genera notificación al admin"
         """
-        # Calcular duración para enriquecer la respuesta
+        if not entry.exit_time:
+            return {'notification_sent': False, 'reason': 'Sesión aún activa'}
+        
         duration_info = RoomEntryBusinessLogic.calculate_session_duration(entry)
-        total_hours = duration_info.get('total_duration_hours', 0) or duration_info.get('current_duration_hours', 0) or 0
-        # Usar el servicio de notificaciones y devolver formato esperado por tests
-        sent = NotificationService.notify_excessive_hours(entry)
-        # Calcular cuántos admins serían notificados (para el resumen)
-        try:
-            from users.models import User
-            admins_count = User.objects.filter(role='admin', is_active=True).count() if total_hours > 8 else 0
-        except Exception:
-            admins_count = 0
+        duration_hours = duration_info.get('total_duration_hours', 0)
+        
+        if duration_hours > 8.0:
+            # Generar notificación
+            admins = User.objects.filter(role='admin', is_verified=True)
+            
+            if admins.exists():
+                notification_message = (
+                    f"⚠️ ALERTA: El monitor {entry.user.get_full_name()} ({entry.user.username}) "
+                    f"ha excedido las 8 horas permitidas en la sala {entry.room.name}.\n\n"
+                    f"📊 Detalles de la sesión:\n"
+                    f"• Sala: {entry.room.name} ({entry.room.code})\n"
+                    f"• Entrada: {entry.entry_time.strftime('%d/%m/%Y a las %H:%M')}\n"
+                    f"• Salida: {entry.exit_time.strftime('%d/%m/%Y a las %H:%M')}\n"
+                    f"• Duración total: {duration_info['formatted_duration']} ({duration_hours} horas)\n"
+                    f"• Exceso: {round(duration_hours - 8, 2)} horas adicionales"
+                )
+                
+                for admin in admins:
+                    Notification.objects.create(
+                        user=admin,
+                        title="Monitor excedió 8 horas continuas",
+                        message=notification_message,
+                        notification_type='excessive_hours',
+                        related_object_id=entry.id
+                    )
+                
+                return {
+                    'notification_sent': True,
+                    'duration_hours': duration_hours,
+                    'excess_hours': round(duration_hours - 8, 2),
+                    'admins_notified': admins.count()
+                }
+            else:
+                return {
+                    'notification_sent': False,
+                    'reason': 'No hay administradores verificados disponibles',
+                    'duration_hours': duration_hours
+                }
+        
         return {
-            'notification_sent': bool(sent),
-            'duration_hours': round(float(total_hours), 1) if isinstance(total_hours, (int, float)) else 0.0,
-            'excess_hours': round(float(total_hours - 8), 1) if total_hours > 8 else 0.0,
-            'reason': 'Duración excede el límite de 8 horas' if total_hours > 8 else 'Duración dentro del límite permitido',
-            'admins_notified': admins_count
+            'notification_sent': False,
+            'reason': 'Duración dentro del límite permitido',
+            'duration_hours': duration_hours
         }
     
     @staticmethod
+    @transaction.atomic
     def create_room_entry_with_validations(user, room, notes=''):
         """
         Garantizar integridad de datos en escenarios concurrentes.
@@ -115,15 +149,6 @@ class RoomEntryBusinessLogic:
                 room=room,
                 notes=notes
             )
-            
-            # Notificar entrada a administradores (no crítico si falla)
-            try:
-                NotificationService.notify_room_entry(entry, is_entry=True)
-            except Exception as e:
-                # Log el error pero no fallar la transacción
-                import logging
-                logger = logging.getLogger(__name__)
-                logger.warning(f"Error enviando notificación de entrada: {e}")
             
             return {
                 'success': True,
@@ -145,6 +170,7 @@ class RoomEntryBusinessLogic:
             }
     
     @staticmethod
+    @transaction.atomic
     def exit_room_entry_with_validations(user, entry_id, notes=''):
         """
         Garantizar integridad de datos en escenarios concurrentes.
@@ -153,7 +179,7 @@ class RoomEntryBusinessLogic:
         try:
             # Buscar la entrada activa del usuario - Solución minimalista
             try:
-                entry = RoomEntry.objects.get(
+                entry = RoomEntry.objects.select_for_update().get(
                     id=entry_id,
                     user=user
                 )
@@ -169,7 +195,7 @@ class RoomEntryBusinessLogic:
             # Verificar si ya fue finalizada
             if entry.exit_time is not None:
                 # Buscar entrada activa del usuario para sugerir el ID correcto
-                active_entry = RoomEntry.objects.filter(user=user, active=True, exit_time__isnull=True).first()
+                active_entry = RoomEntry.objects.filter(user=user, exit_time__isnull=True).first()
                 if active_entry:
                     return {
                         'success': False,
@@ -190,25 +216,15 @@ class RoomEntryBusinessLogic:
             
             # Registrar la salida
             entry.exit_time = timezone.now()
-            entry.active = False  # Marcar como inactiva
             if notes:
                 entry.notes = notes
             entry.save()
-            
-            # Notificar salida a administradores (no crítico si falla)
-            try:
-                NotificationService.notify_room_entry(entry, is_entry=False)
-            except Exception as e:
-                # Log el error pero no fallar la transacción
-                import logging
-                logger = logging.getLogger(__name__)
-                logger.warning(f"Error enviando notificación de salida: {e}")
             
             # Calcular duración
             duration_info = RoomEntryBusinessLogic.calculate_session_duration(entry)
             
             # Verificar y notificar si excede 8 horas
-            notification_sent = RoomEntryBusinessLogic.check_and_notify_excessive_hours(entry)
+            notification_result = RoomEntryBusinessLogic.check_and_notify_excessive_hours(entry)
             
             result = {
                 'success': True,
@@ -217,13 +233,11 @@ class RoomEntryBusinessLogic:
                 'message': 'Salida registrada exitosamente'
             }
             
-            # Verificar si se excedieron las 8 horas
-            if duration_info.get('total_duration_hours', 0) > 8:
-                excess_hours = duration_info.get('total_duration_hours', 0) - 8
+            if notification_result['notification_sent']:
                 result['warning'] = {
-                    'message': f'Sesión excedió las 8 horas permitidas ({duration_info.get("total_duration_hours", 0):.1f} horas)',
-                    'excess_hours': round(excess_hours, 2),
-                    'notification_sent': notification_sent
+                    'message': f'Sesión excedió las 8 horas permitidas ({notification_result["duration_hours"]} horas)',
+                    'excess_hours': notification_result['excess_hours'],
+                    'admins_notified': notification_result['admins_notified']
                 }
             
             return result
@@ -249,7 +263,6 @@ class RoomEntryBusinessLogic:
         try:
             active_entry = RoomEntry.objects.get(
                 user=user,
-                active=True,
                 exit_time__isnull=True
             )
             
