@@ -187,8 +187,17 @@ def admin_entries_list(request):
         from_date = request.GET.get('from', '').strip()
         to_date = request.GET.get('to', '').strip()
         document = request.GET.get('document', '').strip()
-        page = int(request.GET.get('page', 1))
-        page_size = int(request.GET.get('page_size', 20))
+        # Manejo robusto de paginación cuando vienen vacíos o inválidos
+        page_raw = request.GET.get('page', '').strip()
+        page_size_raw = request.GET.get('page_size', '').strip()
+        try:
+            page = int(page_raw) if page_raw else 1
+        except ValueError:
+            page = 1
+        try:
+            page_size = int(page_size_raw) if page_size_raw else 20
+        except ValueError:
+            page_size = 20
         
         # Construir queryset base
         queryset = RoomEntry.objects.select_related('user', 'room').order_by('-entry_time')

@@ -1,8 +1,6 @@
 from rest_framework import serializers
 from django.utils import timezone
 from .models import Schedule
-from users.models import User
-from rooms.models import Room
 
 
 class ScheduleListSerializer(serializers.ModelSerializer):

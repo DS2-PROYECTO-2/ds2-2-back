@@ -38,7 +38,7 @@ def send_password_reset_email(user, reset_url: str) -> str:
         from_email=settings.DEFAULT_FROM_EMAIL,
         recipient_list=[user.email],
         html_message=html,
-        fail_silently=True,
+        fail_silently=False,
     )
     
     # En desarrollo, devolver el enlace para mostrar en consola

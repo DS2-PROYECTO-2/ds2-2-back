@@ -253,8 +253,8 @@ class PasswordResetRequestSerializer(serializers.Serializer):
         try:
             user = User.objects.get(email=email, is_active=True)
         except User.DoesNotExist:
-            # Responder igual para no revelar existencia
-            return {}
+            # Ahora explicitamos que no existe
+            return {'exists': False}
 
         raw_token = generate_raw_token()
         token_hash = hash_token(raw_token)
@@ -268,11 +268,12 @@ class PasswordResetRequestSerializer(serializers.Serializer):
         reset_url = build_password_reset_url(raw_token)
         send_password_reset_email(user, reset_url)
         
-        # Solo devolver enlace si está en modo consola (no SMTP real)
+        # Devolver flag exists y, en modo consola, también el enlace
         from django.conf import settings
+        result = {'exists': True}
         if settings.EMAIL_BACKEND == 'django.core.mail.backends.console.EmailBackend':
-            return {'reset_url': reset_url}
-        return {}
+            result['reset_url'] = reset_url
+        return result
 
 class PasswordResetConfirmSerializer(serializers.Serializer):
     token = serializers.CharField()

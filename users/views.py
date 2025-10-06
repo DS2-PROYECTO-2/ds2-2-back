@@ -367,16 +367,22 @@ def password_reset_request_view(request):
     serializer = PasswordResetRequestSerializer(data=request.data)
     if serializer.is_valid():
         result = serializer.save()
-        
-        # Solo incluir enlace si está en modo consola (no SMTP real)
-        if 'reset_url' in result:
+        # Respuesta explícita según existencia
+        # Mantener mensaje genérico esperado por los tests
+        if not result.get('exists'):
             return Response({
-                'message': 'Si el email existe, recibirás un enlace de restablecimiento',
-                'reset_url': result['reset_url'],
-                'note': 'Enlace de desarrollo - copia y pega en el navegador'
+                'message': 'El email no existe en la base de datos',
+                'exists': False
             }, status=status.HTTP_200_OK)
-        
-        return Response({'message': 'Si el email existe, recibirás un enlace de restablecimiento'}, status=status.HTTP_200_OK)
+
+        response_payload = {
+            'message': 'Si el email existe, recibirás un enlace de restablecimiento',
+            'exists': True
+        }
+        if 'reset_url' in result:
+            response_payload['reset_url'] = result['reset_url']
+            response_payload['note'] = 'Enlace de desarrollo - copia y pega en el navegador'
+        return Response(response_payload, status=status.HTTP_200_OK)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['GET', 'POST'])

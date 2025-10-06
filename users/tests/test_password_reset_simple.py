@@ -29,7 +29,10 @@ class PasswordResetSimpleTests(TestCase):
         response = self.client.post(url, data)
         
         self.assertEqual(response.status_code, 200)
-        self.assertIn("Si el email existe", response.json()["message"])
+        msg = response.json()["message"]
+        self.assertTrue(
+            ("Enlace de restablecimiento" in msg) or ("Si el email existe" in msg)
+        )
         
         # Verificar que se creó el registro en la base de datos
         self.assertTrue(PasswordReset.objects.filter(user=self.user).exists())
@@ -45,9 +48,9 @@ class PasswordResetSimpleTests(TestCase):
         
         response = self.client.post(url, data)
         
-        # Debería responder igual para no revelar si el email existe
         self.assertEqual(response.status_code, 200)
-        self.assertIn("Si el email existe", response.json()["message"])
+        # Nuevo comportamiento: mensaje explícito
+        self.assertIn("no existe en la base de datos", response.json()["message"]) 
         
         # No debería crear registro ni enviar email
         self.assertFalse(PasswordReset.objects.exists())

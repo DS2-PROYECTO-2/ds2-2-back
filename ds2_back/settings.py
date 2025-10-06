@@ -1,5 +1,6 @@
 from pathlib import Path
 import environ
+import sys
 
 """
 Django settings for ds2_back project.
@@ -95,32 +96,44 @@ WSGI_APPLICATION = 'ds2_back.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
-import sys
-
-# Configuración condicional de base de datos
+# Estrategia de selección de base de datos:
+# 1) Tests: SQLite en memoria
+# 2) Si existe DATABASE_URL en .env -> usarla (soporta sqlite/postgres)
+# 3) Si hay variables DB_* -> usar PostgreSQL
+# 4) Fallback: SQLite en archivo
 if 'test' in sys.argv or 'pytest' in sys.modules:
-    # SQLite para tests (más rápido y no requiere servidor PostgreSQL)
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.sqlite3',
-            'NAME': ':memory:',  # Base de datos en memoria para tests más rápidos
-            'OPTIONS': {
-                'timeout': 20,
-            },
+            'NAME': ':memory:',
+            'OPTIONS': {'timeout': 20},
         }
     }
 else:
-    # PostgreSQL para desarrollo y producción
-    DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.postgresql',
-            'NAME': env('DB_NAME'),
-            'USER': env('DB_USER'),
-            'PASSWORD': env('DB_PASSWORD'),
-            'HOST': env('DB_HOST'),
-            'PORT': env('DB_PORT'),
+    database_url = env.str('DATABASE_URL', default='')
+    if database_url:
+        DATABASES = {
+            'default': env.db(),
         }
-    }
+    elif env.str('DB_NAME', default=''):
+        DATABASES = {
+            'default': {
+                'ENGINE': 'django.db.backends.postgresql',
+                'NAME': env('DB_NAME'),
+                'USER': env('DB_USER', default='postgres'),
+                'PASSWORD': env('DB_PASSWORD', default=''),
+                'HOST': env('DB_HOST', default='127.0.0.1'),
+                'PORT': env('DB_PORT', default='5432'),
+            }
+        }
+    else:
+        DATABASES = {
+            'default': {
+                'ENGINE': 'django.db.backends.sqlite3',
+                'NAME': BASE_DIR / 'db.sqlite3',
+                'OPTIONS': {'timeout': 20},
+            }
+        }
 
 # SQLite Configuration (backup para desarrollo local si es necesario)
 # DATABASES = {
