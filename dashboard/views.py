@@ -197,3 +197,5 @@ def admin_overview_view(request):
             'error': 'Error interno del servidor',
             'details': str(e)
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
