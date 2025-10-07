@@ -523,3 +523,5 @@ class DashboardService:
             'alerts': [],
             'charts_data': {'daily_usage': [], 'room_occupancy': []}
         }
+
+

@@ -88,6 +88,12 @@ class EquipmentReport(models.Model):
         verbose_name="Descripción del Problema",
         help_text='Descripción detallada del problema reportado'
     )
+    issue_type = models.CharField(
+        max_length=100,
+        blank=True,
+        verbose_name="Tipo de Falla",
+        help_text='Tipo de falla (texto libre, p. ej. hardware, software, red, etc.)'
+    )
     reported_date = models.DateTimeField(
         auto_now_add=True, 
         verbose_name="Fecha del Reporte",

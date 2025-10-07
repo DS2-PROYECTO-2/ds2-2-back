@@ -51,3 +51,5 @@ class DashboardDataSerializer(serializers.Serializer):
     recent_activities = serializers.ListField()
     alerts = serializers.ListField()
     charts_data = serializers.DictField()
+
+

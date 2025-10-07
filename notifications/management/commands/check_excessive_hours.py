@@ -78,3 +78,5 @@ class Command(BaseCommand):
             )
             logger.error(f"Error en verificación de exceso de horas: {e}")
             raise
+
+

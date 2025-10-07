@@ -145,3 +145,5 @@ class Command(BaseCommand):
                 self.style.ERROR(f'❌ Error creando usuarios: {str(e)}')
             )
             logger.error(f"Error creando usuarios: {e}")
+
+

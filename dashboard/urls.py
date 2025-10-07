@@ -14,3 +14,5 @@ urlpatterns = [
     # Vista administrativa
     path('admin/overview/', views.admin_overview_view, name='admin_overview'),
 ]
+
+
