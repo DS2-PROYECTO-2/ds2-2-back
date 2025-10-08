@@ -274,6 +274,244 @@ def admin_promote_user_view(request, user_id):
     }, status=status.HTTP_200_OK)
 
 
+@api_view(['PATCH'])
+@authentication_classes([TokenAuthentication])
+@permission_classes([IsAdminUser])
+def admin_edit_user_view(request, user_id):
+    """
+    Vista consolidada para que los administradores editen información completa de usuarios
+    Incluye: información personal, rol y verificación
+    """
+    try:
+        target_user = User.objects.get(id=user_id)
+    except User.DoesNotExist:
+        return Response({
+            'error': f'Usuario con ID {user_id} no encontrado'
+        }, status=status.HTTP_404_NOT_FOUND)
+    
+    # Prevenir que un admin edite otro admin (excepto a sí mismo)
+    if target_user.role == 'admin' and target_user != request.user:
+        return Response({
+            'error': 'No se puede editar información de otros administradores'
+        }, status=status.HTTP_403_FORBIDDEN)
+    
+    # Campos editables básicos
+    basic_fields = ['first_name', 'last_name', 'email', 'phone', 'identification']
+    update_data = {k: v for k, v in request.data.items() if k in basic_fields}
+    
+    # Campos administrativos especiales
+    admin_fields = {}
+    changes_made = []
+    
+    # Manejo de cambio de rol
+    if 'role' in request.data:
+        new_role = request.data['role']
+        if new_role in ['admin', 'monitor']:
+            if target_user.role != new_role:
+                # Solo permitir ascender monitores a admins
+                if target_user.role == 'monitor' and new_role == 'admin':
+                    admin_fields['role'] = new_role
+                    changes_made.append(f'ascendido a {new_role}')
+                # Permitir degradar admins a monitores (solo para casos especiales)
+                elif target_user.role == 'admin' and new_role == 'monitor':
+                    admin_fields['role'] = new_role
+                    changes_made.append(f'cambiado a {new_role}')
+                else:
+                    return Response({
+                        'error': f'Cambio de rol inválido: de {target_user.role} a {new_role}'
+                    }, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            return Response({
+                'error': 'Rol inválido. Solo se permite "admin" o "monitor"'
+            }, status=status.HTTP_400_BAD_REQUEST)
+    
+    # Manejo de verificación
+    if 'is_verified' in request.data:
+        new_verification = request.data['is_verified']
+        # Convertir string a boolean si es necesario
+        if isinstance(new_verification, str):
+            if new_verification.lower() == 'true':
+                new_verification = True
+            elif new_verification.lower() == 'false':
+                new_verification = False
+            else:
+                return Response({
+                    'error': 'is_verified debe ser true o false'
+                }, status=status.HTTP_400_BAD_REQUEST)
+        elif not isinstance(new_verification, bool):
+            return Response({
+                'error': 'is_verified debe ser true o false'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        if target_user.is_verified != new_verification:
+            admin_fields['is_verified'] = new_verification
+            admin_fields['verified_by'] = request.user if new_verification else None
+            # Marcar que la verificación cambió para activar el signal
+            target_user._verification_changed = True
+            changes_made.append('verificado' if new_verification else 'desverificado')
+    
+    # Verificar que al menos hay algo que actualizar
+    if not update_data and not admin_fields:
+        return Response({
+            'error': 'No se proporcionaron campos válidos para actualizar'
+        }, status=status.HTTP_400_BAD_REQUEST)
+    
+    # Actualizar campos básicos
+    for field, value in update_data.items():
+        if getattr(target_user, field) != value:
+            setattr(target_user, field, value)
+            changes_made.append(f'{field} actualizado')
+    
+    # Actualizar campos administrativos
+    for field, value in admin_fields.items():
+        setattr(target_user, field, value)
+    
+    try:
+        target_user.save()
+    except Exception as e:
+        return Response({
+            'error': f'Error al actualizar usuario: {str(e)}'
+        }, status=status.HTTP_400_BAD_REQUEST)
+    
+    # Mensaje de respuesta descriptivo
+    if changes_made:
+        changes_text = ', '.join(changes_made)
+        message = f'Usuario {target_user.username} actualizado exitosamente: {changes_text}'
+    else:
+        message = f'Usuario {target_user.username} - sin cambios realizados'
+    
+    return Response({
+        'message': message,
+        'user': {
+            'id': target_user.id,
+            'username': target_user.username,
+            'first_name': target_user.first_name,
+            'last_name': target_user.last_name,
+            'email': target_user.email,
+            'phone': target_user.phone,
+            'identification': target_user.identification,
+            'role': target_user.role,
+            'is_verified': target_user.is_verified
+        }
+    }, status=status.HTTP_200_OK)
+
+
+@api_view(['GET'])
+@authentication_classes([TokenAuthentication])
+@permission_classes([IsAdminUser])
+def admin_user_detail_view(request, user_id):
+    """
+    Vista para obtener detalles de un usuario específico
+    """
+    try:
+        target_user = User.objects.get(id=user_id)
+    except User.DoesNotExist:
+        return Response({
+            'error': f'Usuario con ID {user_id} no encontrado'
+        }, status=status.HTTP_404_NOT_FOUND)
+    
+    return Response({
+        'user': {
+            'id': target_user.id,
+            'username': target_user.username,
+            'first_name': target_user.first_name,
+            'last_name': target_user.last_name,
+            'email': target_user.email,
+            'phone': target_user.phone,
+            'identification': target_user.identification,
+            'role': target_user.role,
+            'is_verified': target_user.is_verified,
+            'date_joined': target_user.date_joined,
+            'last_login': target_user.last_login,
+            'is_active': target_user.is_active
+        }
+    }, status=status.HTTP_200_OK)
+
+
+@api_view(['GET'])
+@authentication_classes([TokenAuthentication])
+@permission_classes([IsAdminUser])
+def admin_users_search_view(request):
+    """
+    Vista para buscar usuarios con filtros múltiples
+    """
+    queryset = User.objects.all()
+    
+    # Filtro por rol
+    role = request.query_params.get('role')
+    if role in ['admin', 'monitor']:
+        queryset = queryset.filter(role=role)
+    
+    # Filtro por estado de verificación
+    is_verified = request.query_params.get('is_verified')
+    if is_verified in ['true', 'false']:
+        queryset = queryset.filter(is_verified=is_verified.lower() == 'true')
+    
+    # Filtro por estado activo
+    is_active = request.query_params.get('is_active')
+    if is_active in ['true', 'false']:
+        queryset = queryset.filter(is_active=is_active.lower() == 'true')
+    
+    # Búsqueda por texto (username, email, nombre)
+    search = request.query_params.get('search')
+    if search:
+        from django.db.models import Q
+        queryset = queryset.filter(
+            Q(username__icontains=search) |
+            Q(email__icontains=search) |
+            Q(first_name__icontains=search) |
+            Q(last_name__icontains=search) |
+            Q(identification__icontains=search)
+        )
+    
+    # Ordenamiento
+    order_by = request.query_params.get('order_by', 'date_joined')
+    if order_by.startswith('-'):
+        order_field = order_by[1:]
+    else:
+        order_field = order_by
+    
+    valid_order_fields = ['username', 'email', 'role', 'is_verified', 'date_joined']
+    if order_field in valid_order_fields:
+        queryset = queryset.order_by(order_by)
+    
+    # Paginación básica
+    page_size = min(int(request.query_params.get('page_size', 20)), 100)  # Max 100
+    page = int(request.query_params.get('page', 1))
+    start = (page - 1) * page_size
+    end = start + page_size
+    
+    total_count = queryset.count()
+    users = queryset[start:end]
+    
+    return Response({
+        'users': [{
+            'id': user.id,
+            'username': user.username,
+            'first_name': user.first_name,
+            'last_name': user.last_name,
+            'email': user.email,
+            'role': user.role,
+            'is_verified': user.is_verified,
+            'is_active': user.is_active,
+            'date_joined': user.date_joined
+        } for user in users],
+        'pagination': {
+            'total_count': total_count,
+            'page': page,
+            'page_size': page_size,
+            'total_pages': (total_count + page_size - 1) // page_size
+        },
+        'filters_applied': {
+            'role': role,
+            'is_verified': is_verified,
+            'is_active': is_active,
+            'search': search,
+            'order_by': order_by
+        }
+    }, status=status.HTTP_200_OK)
+
+
 @api_view(['GET'])
 @authentication_classes([TokenAuthentication])
 @permission_classes([IsVerifiedUser])
