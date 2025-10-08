@@ -235,6 +235,45 @@ def admin_verify_user_view(request, user_id):
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
+@api_view(['POST'])
+@authentication_classes([TokenAuthentication])
+@permission_classes([IsAdminUser])
+def admin_promote_user_view(request, user_id):
+    """
+    Vista minimalista para que los administradores asciendan monitores a administradores.
+    Reglas:
+    - Solo admins pueden usar este endpoint
+    - Solo se puede ascender monitores a admins
+    - No se puede cambiar el rol de otros admins
+    """
+    try:
+        target_user = User.objects.get(id=user_id)
+    except User.DoesNotExist:
+        return Response({
+            'error': f'Usuario con ID {user_id} no encontrado'
+        }, status=status.HTTP_404_NOT_FOUND)
+    
+    # Validar que el usuario objetivo sea monitor
+    if target_user.role != 'monitor':
+        return Response({
+            'error': f'Solo se pueden ascender monitores a administradores. Usuario actual: {target_user.role}'
+        }, status=status.HTTP_400_BAD_REQUEST)
+    
+    # Ascender a admin
+    target_user.role = 'admin'
+    target_user.save()
+    
+    return Response({
+        'message': f'Usuario {target_user.username} ascendido a administrador exitosamente',
+        'user': {
+            'id': target_user.id,
+            'username': target_user.username,
+            'role': target_user.role,
+            'is_verified': target_user.is_verified
+        }
+    }, status=status.HTTP_200_OK)
+
+
 @api_view(['GET'])
 @authentication_classes([TokenAuthentication])
 @permission_classes([IsVerifiedUser])

@@ -18,6 +18,7 @@ urlpatterns = [
     # Administración de usuarios (solo admins)
     path('admin/users/', views.admin_users_list_view, name='admin_users_list'),                     # GET - Listar todos los usuarios
     path('admin/users/<int:user_id>/verify/', views.admin_verify_user_view, name='admin_verify_user'), # POST - Verificar usuario
+    path('admin/users/<int:user_id>/promote/', views.admin_promote_user_view, name='admin_promote_user'), # POST - Ascender monitor a admin
 
     path('admin/users/<int:user_id>/', views.admin_delete_user_view, name='admin_delete_user'),     # DELETE - Eliminar usuario
 
