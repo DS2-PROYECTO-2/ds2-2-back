@@ -1,0 +1,46 @@
+# Django Backend - Sistema de Gestión de Salas y Turnos
+# Proyecto DS2 - Requirements
+
+# Core Django Framework
+Django==4.2.16
+djangorestframework==3.14.0
+
+# Database
+psycopg2-binary==2.9.9  # PostgreSQL adapter
+django-cors-headers==4.3.1  # CORS handling
+
+# Authentication & Security
+djangorestframework-simplejwt==5.3.0  # JWT authentication
+django-oauth-toolkit==1.7.1  # OAuth2 support
+
+# API Documentation
+drf-spectacular==0.26.5  # OpenAPI/Swagger generation
+
+# Testing Framework
+pytest==8.4.1
+pytest-django==4.8.0
+pytest-cov==4.1.0  # Coverage reporting
+
+# Development Tools
+django-debug-toolbar==4.2.0  # Debug toolbar
+django-extensions==3.2.3  # Extended management commands
+
+# Utilities
+python-decouple==3.8  # Environment variables
+pytz==2023.3  # Timezone handling
+Pillow==10.1.0  # Image processing
+
+# Production
+gunicorn==21.2.0  # WSGI server
+whitenoise==6.6.0  # Static files serving
+
+# Email
+django-anymail==10.2  # Email backend
+
+# Validation & Forms
+django-crispy-forms==2.1  # Better forms
+crispy-bootstrap4==2022.1
+
+# Additional Django packages
+django-filter==23.5  # Filtering support
+django-import-export==3.3.1  # Data import/export
