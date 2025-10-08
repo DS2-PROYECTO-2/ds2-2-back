@@ -2,7 +2,6 @@
 Test de integración para validar que el sistema de rooms ahora requiere turnos
 y previene múltiples monitores por sala (PETICIÓN 2)
 """
-import pytest
 from django.test import TestCase
 from django.utils import timezone
 from users.models import User
