@@ -4,12 +4,13 @@ from rest_framework.authentication import TokenAuthentication
 from rest_framework.response import Response
 from rest_framework import status
 from django.shortcuts import get_object_or_404
+from django.utils import timezone
 from .models import Room, RoomEntry
 from .serializers import (
     RoomSerializer, 
     RoomEntrySerializer
 )
-from .services import RoomEntryBusinessLogic
+from .services import RoomEntryBusinessLogic, auto_close_expired_sessions
 from users.permissions import IsVerifiedUser
 
 
@@ -319,3 +320,30 @@ def room_current_occupants_view(request, room_id):
         'current_occupants': active_entries.count(),
         'entries': serializer.data
     }, status=status.HTTP_200_OK)
+
+
+@api_view(['POST'])
+@authentication_classes([TokenAuthentication])
+@permission_classes([IsVerifiedUser])
+def close_expired_sessions_view(request):
+    """
+    Endpoint para cerrar automáticamente sesiones vencidas
+    Útil para mantener el sistema limpio y evitar bloqueos
+    """
+    try:
+        closed_sessions = auto_close_expired_sessions()
+        
+        return Response({
+            'success': True,
+            'message': f'Se revisaron y cerraron {len(closed_sessions)} sesiones vencidas',
+            'closed_sessions_count': len(closed_sessions),
+            'closed_sessions': closed_sessions,
+            'timestamp': timezone.now().strftime('%Y-%m-%d %H:%M:%S')
+        }, status=status.HTTP_200_OK)
+        
+    except Exception as e:
+        return Response({
+            'success': False,
+            'error': 'Error al cerrar sesiones vencidas',
+            'details': str(e)
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

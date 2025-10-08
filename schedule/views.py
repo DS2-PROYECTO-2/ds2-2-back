@@ -4,6 +4,7 @@ from rest_framework.authentication import TokenAuthentication
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django.utils import timezone
+from django.core.exceptions import ValidationError
 from datetime import datetime, timedelta
 
 from .models import Schedule
@@ -11,6 +12,7 @@ from .serializers import (
     ScheduleListSerializer, ScheduleDetailSerializer, 
     ScheduleCreateUpdateSerializer, MonitorScheduleSerializer
 )
+from .services import ScheduleValidationService, ScheduleComplianceMonitor
 from users.permissions import IsVerifiedUser
 from rooms.permissions import IsAdminUser
 
@@ -82,6 +84,182 @@ class ScheduleViewSet(viewsets.ModelViewSet):
             'count': queryset.count(),
             'current_schedules': serializer.data
         })
+    
+    def perform_create(self, serializer):
+        """
+        Validar conflictos antes de crear un turno
+        Tarea 2: Validaciones de integración con calendarios
+        """
+        # Obtener datos del serializer
+        user = serializer.validated_data['user']
+        room = serializer.validated_data['room']
+        start_datetime = serializer.validated_data['start_datetime']
+        end_datetime = serializer.validated_data['end_datetime']
+        
+        try:
+            # Aplicar validaciones de conflictos
+            ScheduleValidationService.validate_schedule_conflicts(
+                user=user,
+                room=room,
+                start_datetime=start_datetime,
+                end_datetime=end_datetime
+            )
+            
+            # Si no hay conflictos, proceder con la creación
+            serializer.save(created_by=self.request.user)
+            
+        except ValidationError as e:
+            from rest_framework.exceptions import ValidationError as DRFValidationError
+            raise DRFValidationError(e.error_dict)
+    
+    def perform_update(self, serializer):
+        """
+        Validar conflictos antes de actualizar un turno
+        """
+        # Obtener datos del serializer
+        user = serializer.validated_data.get('user', serializer.instance.user)
+        room = serializer.validated_data.get('room', serializer.instance.room)
+        start_datetime = serializer.validated_data.get('start_datetime', serializer.instance.start_datetime)
+        end_datetime = serializer.validated_data.get('end_datetime', serializer.instance.end_datetime)
+        
+        try:
+            # Aplicar validaciones de conflictos (excluyendo el turno actual)
+            ScheduleValidationService.validate_schedule_conflicts(
+                user=user,
+                room=room,
+                start_datetime=start_datetime,
+                end_datetime=end_datetime,
+                exclude_schedule_id=serializer.instance.id
+            )
+            
+            # Si no hay conflictos, proceder con la actualización
+            serializer.save()
+            
+        except ValidationError as e:
+            from rest_framework.exceptions import ValidationError as DRFValidationError
+            raise DRFValidationError(e.error_dict)
+    
+    @action(detail=False, methods=['post'])
+    def validate_room_access(self, request):
+        """
+        Endpoint para validar acceso a sala basado en turnos asignados
+        Usado por el sistema de entrada a salas
+        """
+        try:
+            room_id = request.data.get('room_id')
+            user_id = request.data.get('user_id', request.user.id)
+            access_datetime = request.data.get('access_datetime')
+            
+            if not room_id:
+                return Response({
+                    'error': 'room_id es requerido'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Obtener modelos
+            from rooms.models import Room
+            from django.contrib.auth.models import User
+            
+            try:
+                room = Room.objects.get(id=room_id)
+                user = User.objects.get(id=user_id)
+            except (Room.DoesNotExist, User.DoesNotExist) as e:
+                return Response({
+                    'error': f'Recurso no encontrado: {str(e)}'
+                }, status=status.HTTP_404_NOT_FOUND)
+            
+            # Parsear datetime si se proporciona
+            if access_datetime:
+                try:
+                    access_datetime = timezone.datetime.fromisoformat(access_datetime.replace('Z', '+00:00'))
+                except ValueError:
+                    return Response({
+                        'error': 'Formato de fecha inválido. Use formato ISO 8601'
+                    }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Validar acceso
+            try:
+                active_schedule = ScheduleValidationService.validate_room_access_permission(
+                    user=user,
+                    room=room,
+                    access_datetime=access_datetime
+                )
+                
+                return Response({
+                    'access_granted': True,
+                    'schedule': {
+                        'id': active_schedule.id,
+                        'start_datetime': active_schedule.start_datetime,
+                        'end_datetime': active_schedule.end_datetime,
+                        'room': active_schedule.room.name,
+                        'room_code': active_schedule.room.code
+                    }
+                })
+                
+            except ValidationError as e:
+                return Response({
+                    'access_granted': False,
+                    'error': e.error_dict
+                }, status=status.HTTP_403_FORBIDDEN)
+                
+        except Exception as e:
+            return Response({
+                'error': 'Error interno del servidor',
+                'details': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
+    @action(detail=True, methods=['post'])
+    def check_compliance(self, request, pk=None):
+        """
+        Verificar cumplimiento de un turno específico
+        Solo para administradores
+        """
+        if not request.user.is_staff:
+            return Response({
+                'error': 'Permisos insuficientes'
+            }, status=status.HTTP_403_FORBIDDEN)
+        
+        try:
+            schedule = self.get_object()
+            compliance_result = ScheduleValidationService.check_schedule_compliance(schedule.id)
+            
+            # Si no cumple, generar notificación
+            if compliance_result['status'] == 'non_compliant':
+                notifications = ScheduleValidationService.notify_admin_schedule_non_compliance(
+                    schedule, compliance_result
+                )
+                compliance_result['notifications_sent'] = len(notifications) if notifications else 0
+            
+            return Response(compliance_result)
+            
+        except Exception as e:
+            return Response({
+                'error': 'Error al verificar cumplimiento',
+                'details': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
+    @action(detail=False, methods=['post'])
+    def run_compliance_check(self, request):
+        """
+        Ejecutar verificación masiva de cumplimiento de turnos
+        Solo para administradores
+        """
+        if not request.user.is_staff:
+            return Response({
+                'error': 'Permisos insuficientes'
+            }, status=status.HTTP_403_FORBIDDEN)
+        
+        try:
+            result = ScheduleComplianceMonitor.check_overdue_schedules()
+            return Response({
+                'message': 'Verificación de cumplimiento completada',
+                'result': result
+            })
+            
+        except Exception as e:
+            return Response({
+                'error': 'Error al ejecutar verificación masiva',
+                'details': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(['GET'])

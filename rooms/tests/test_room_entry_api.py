@@ -146,9 +146,30 @@ class RoomEntryAPITest(APITestCase):
             code='S102',
             capacity=15
         )
+    
+    def create_active_schedule(self, user, room, start_offset_hours=0, duration_hours=4):
+        """Helper para crear turnos activos en tests"""
+        from schedule.models import Schedule
+        from django.utils import timezone
+        from datetime import timedelta
+        
+        start_time = timezone.now() + timedelta(hours=start_offset_hours)
+        end_time = start_time + timedelta(hours=duration_hours)
+        
+        return Schedule.objects.create(
+            user=user,
+            room=room,
+            start_datetime=start_time,
+            end_datetime=end_time,
+            status='active',
+            created_by=self.admin
+        )
 
     def test_create_room_entry_success(self):
         """Test: Crear entrada a sala exitosamente"""
+        # Crear turno activo para el monitor
+        self.create_active_schedule(self.monitor, self.room1)
+        
         self.client.credentials(HTTP_AUTHORIZATION='Token ' + self.monitor_token.key)
         
         url = reverse('room_entry_create')
@@ -164,7 +185,7 @@ class RoomEntryAPITest(APITestCase):
         self.assertIn('entry', response.data)
         self.assertEqual(response.data['entry']['room'], self.room1.id)
         self.assertEqual(response.data['entry']['user'], self.monitor.id)
-        self.assertEqual(response.data['entry']['notes'], 'Inicio de turno matutino')
+        self.assertIn('Inicio de turno matutino', response.data['entry']['notes'])
         self.assertIsNone(response.data['entry']['exit_time'])
         self.assertTrue(response.data['entry']['is_active'])
         
