@@ -4,6 +4,79 @@ from .models import RoomEntry
 from notifications.services import NotificationService
 
 
+class ScheduleValidationService:
+    """
+    Servicio básico de validación de turnos para integración con rooms
+    """
+    @staticmethod
+    def validate_room_access_permission(user, room, access_datetime=None):
+        """
+        Validar que el usuario tenga un turno activo para acceder a la sala
+        """
+        if access_datetime is None:
+            access_datetime = timezone.now()
+        
+        # Importar aquí para evitar importación circular
+        from schedule.models import Schedule
+        
+        # Verificar que el usuario tenga un turno activo en esa sala en ese momento
+        active_schedule = Schedule.objects.filter(
+            user=user,
+            room=room,
+            status=Schedule.ACTIVE,
+            start_datetime__lte=access_datetime,
+            end_datetime__gte=access_datetime
+        ).first()
+        
+        if not active_schedule:
+            raise ValidationError({
+                'access_denied': f'El monitor {user.username} no tiene un turno asignado en la sala {room.name} para el horario actual.',
+                'current_time': access_datetime,
+                'room_code': room.code,
+                'message': 'Solo los monitores con turnos asignados pueden acceder a las salas.'
+            })
+        
+        return active_schedule
+    
+    @staticmethod
+    def validate_no_multiple_monitors_in_room(room, exclude_user=None):
+        """
+        Validar que no haya múltiples monitores en la misma sala simultáneamente
+        PETICIÓN 2: "el sistema no debe permitir que 2 monitores permanezcan en la misma"
+        """
+        # Verificar entradas activas en la sala
+        active_entries_query = RoomEntry.objects.filter(
+            room=room,
+            active=True,
+            exit_time__isnull=True
+        ).select_related('user')
+        
+        # Si estamos validando para un usuario específico, excluirlo
+        if exclude_user:
+            active_entries_query = active_entries_query.exclude(user=exclude_user)
+        
+        active_entries = active_entries_query
+        
+        if active_entries.exists():
+            active_monitors = []
+            for entry in active_entries:
+                active_monitors.append({
+                    'username': entry.user.username,
+                    'full_name': entry.user.get_full_name() or entry.user.username,
+                    'entry_time': entry.entry_time,
+                    'duration_minutes': int((timezone.now() - entry.entry_time).total_seconds() / 60)
+                })
+            
+            raise ValidationError({
+                'multiple_monitors': f'La sala {room.name} ({room.code}) ya tiene un monitor activo. No se permiten múltiples monitores por sala simultáneamente.',
+                'active_monitors': active_monitors,
+                'room_code': room.code,
+                'current_time': timezone.now()
+            })
+        
+        return True
+
+
 class RoomEntryBusinessLogic:
     """
     Lógica de negocio para validaciones de entrada/salida de salas
@@ -99,21 +172,91 @@ class RoomEntryBusinessLogic:
             'admins_notified': admins_count
         }
     
+
+    
     @staticmethod
     def create_room_entry_with_validations(user, room, notes=''):
         """
         Garantizar integridad de datos en escenarios concurrentes.
         Crear entrada con todas las validaciones aplicadas
+        INTEGRACIÓN TAREA 2: Validar turnos y múltiples monitores
         """
         try:
-            # Validar que no haya entrada simultánea
+            # PASO 0: Cerrar sesiones vencidas automáticamente
+            closed_sessions = auto_close_expired_sessions()
+            
+            # VALIDACIÓN 1: Verificar que el monitor tenga turno asignado (TAREA 2)
+            try:
+                active_schedule = ScheduleValidationService.validate_room_access_permission(
+                    user=user, 
+                    room=room, 
+                    access_datetime=timezone.now()
+                )
+            except ValidationError as schedule_error:
+                response = {
+                    'success': False,
+                    'error': 'Sin turno asignado para esta sala',
+                    'message': f'El monitor {user.username} no tiene un turno activo en {room.name} ({room.code}) en este momento.',
+                    'details': {
+                        'reason': 'schedule_required',
+                        'current_time': timezone.now().strftime('%Y-%m-%d %H:%M:%S'),
+                        'room': room.code,
+                        'user': user.username
+                    }
+                }
+                if closed_sessions:
+                    response['info'] = f'Se cerraron {len(closed_sessions)} sesiones vencidas automáticamente.'
+                return response
+            
+            # VALIDACIÓN 2: Verificar que no haya múltiples monitores en la sala (PETICIÓN 2)
+            try:
+                ScheduleValidationService.validate_no_multiple_monitors_in_room(
+                    room=room, 
+                    exclude_user=user
+                )
+            except ValidationError as multi_monitor_error:
+                # Obtener información del monitor actual en la sala
+                current_occupant = RoomEntry.objects.filter(
+                    room=room, 
+                    active=True, 
+                    exit_time__isnull=True
+                ).select_related('user').first()
+                
+                response = {
+                    'success': False,
+                    'error': 'Sala ocupada por otro monitor',
+                    'message': f'La sala {room.name} ({room.code}) está ocupada. Solo se permite un monitor por sala.',
+                    'details': {
+                        'reason': 'room_occupied',
+                        'current_time': timezone.now().strftime('%Y-%m-%d %H:%M:%S'),
+                        'room': room.code,
+                        'requesting_user': user.username
+                    }
+                }
+                
+                if current_occupant:
+                    duration = timezone.now() - current_occupant.entry_time
+                    response['current_occupant'] = {
+                        'username': current_occupant.user.username,
+                        'name': current_occupant.user.get_full_name() or current_occupant.user.username,
+                        'entry_time': current_occupant.entry_time.strftime('%H:%M:%S'),
+                        'duration_minutes': int(duration.total_seconds() / 60)
+                    }
+                    response['message'] += f' Actualmente ocupada por {current_occupant.user.username}.'
+                
+                if closed_sessions:
+                    response['info'] = f'Se cerraron {len(closed_sessions)} sesiones vencidas automáticamente.'
+                
+                return response
+            
+            # VALIDACIÓN 3: Validar que no haya entrada simultánea del mismo usuario
             RoomEntryBusinessLogic.validate_no_simultaneous_entry(user)
             
-            # Crear la entrada
+            # Crear la entrada con información del turno
             entry = RoomEntry.objects.create(
                 user=user,
                 room=room,
-                notes=notes
+                notes=f"{notes}. Turno ID: {active_schedule.id}" if notes else f"Turno ID: {active_schedule.id}"
             )
             
             # Notificar entrada a administradores (no crítico si falla)
@@ -125,11 +268,36 @@ class RoomEntryBusinessLogic:
                 logger = logging.getLogger(__name__)
                 logger.warning(f"Error enviando notificación de entrada: {e}")
             
-            return {
+            # Construir respuesta exitosa clara
+            response = {
                 'success': True,
-                'entry': entry,
-                'message': 'Entrada registrada exitosamente con validaciones aplicadas'
+                'message': f'Acceso concedido a {room.name} ({room.code})',
+                'entry': entry,  # Devolver el objeto real para serialización
+                'entry_info': {
+                    'id': entry.id,
+                    'room': room.code,
+                    'room_name': room.name,
+                    'entry_time': entry.entry_time.strftime('%Y-%m-%d %H:%M:%S'),
+                    'user': user.username
+                },
+                'schedule': {
+                    'id': active_schedule.id,
+                    'start_time': active_schedule.start_datetime.strftime('%H:%M'),
+                    'end_time': active_schedule.end_datetime.strftime('%H:%M'),
+                    'remaining_minutes': int((active_schedule.end_datetime - timezone.now()).total_seconds() / 60)
+                },
+                'details': {
+                    'turno_valido_hasta': active_schedule.end_datetime.strftime('%H:%M'),
+                    'cierre_automatico': f'La sesión se cerrará automáticamente a las {active_schedule.end_datetime.strftime("%H:%M")}',
+                    'current_time': timezone.now().strftime('%Y-%m-%d %H:%M:%S')
+                }
             }
+            
+            if closed_sessions:
+                response['info'] = f'Se cerraron {len(closed_sessions)} sesiones vencidas automáticamente antes de tu entrada.'
+                response['closed_sessions'] = len(closed_sessions)
+            
+            return response
             
         except ValidationError as e:
             return {
@@ -321,3 +489,46 @@ class RoomEntryBusinessLogic:
             'sessions': sessions_detail,
             'warning': total_hours > 8
         }
+
+
+def auto_close_expired_sessions():
+    """
+    Cerrar automáticamente sesiones de monitores cuyos turnos han terminado
+    SOLUCIÓN MINIMALISTA: Evita bloqueos de sala por sesiones vencidas
+    """
+    from schedule.models import Schedule
+    
+    current_time = timezone.now()
+    closed_sessions = []
+    
+    # Buscar entradas activas cuyo turno ya terminó
+    active_entries = RoomEntry.objects.filter(
+        active=True,
+        exit_time__isnull=True
+    ).select_related('user', 'room')
+    
+    for entry in active_entries:
+        # Buscar si el usuario tiene turno vencido en esa sala
+        expired_schedule = Schedule.objects.filter(
+            user=entry.user,
+            room=entry.room,
+            status=Schedule.ACTIVE,
+            end_datetime__lt=current_time  # Turno ya terminó
+        ).first()
+        
+        if expired_schedule:
+            # Cerrar la sesión automáticamente
+            entry.exit_time = current_time
+            entry.active = False
+            entry.notes = f"{entry.notes}. CIERRE AUTOMÁTICO: Turno terminado a las {expired_schedule.end_datetime.strftime('%H:%M')}"
+            entry.save()
+            
+            closed_sessions.append({
+                'user': entry.user.username,
+                'room': entry.room.code,
+                'entry_id': entry.id,
+                'schedule_end': expired_schedule.end_datetime,
+                'auto_closed_at': current_time
+            })
+    
+    return closed_sessions
