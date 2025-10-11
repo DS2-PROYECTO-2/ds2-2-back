@@ -83,7 +83,7 @@ class ScheduleValidationService:
     @staticmethod
     def check_schedule_compliance(schedule_id):
         """
-        Verificar cumplimiento de turno con período de gracia de 20 minutos
+        Verificar cumplimiento de turno con período de gracia de 5 minutos
         """
         from .models import Schedule
         from rooms.models import RoomEntry
@@ -95,7 +95,7 @@ class ScheduleValidationService:
             return {'status': 'not_found', 'message': 'Turno no encontrado o no activo'}
         
         current_time = timezone.now()
-        grace_period = timedelta(minutes=20)
+        grace_period = timedelta(minutes=5)
         
         # Si el turno aún no ha comenzado
         if current_time < schedule.start_datetime:
@@ -151,7 +151,7 @@ Monitor: {schedule.user.get_full_name() or schedule.user.username} ({schedule.us
 Sala: {schedule.room.name} ({schedule.room.code})
 Turno programado: {schedule.start_datetime.strftime('%Y-%m-%d %H:%M')} - {schedule.end_datetime.strftime('%Y-%m-%d %H:%M')}
 
-El monitor no registró entrada dentro del período de gracia de 20 minutos.
+El monitor no registró entrada dentro del período de gracia de 5 minutos.
 Límite de gracia: {compliance_check_result['grace_deadline'].strftime('%Y-%m-%d %H:%M')}
 Hora actual de verificación: {compliance_check_result['current_time'].strftime('%Y-%m-%d %H:%M')}
 
@@ -164,9 +164,9 @@ Se requiere seguimiento administrativo."""
                 user=admin,
                 title=f"Incumplimiento de Turno - {schedule.room.code}",
                 message=message,
-                notification_type='EXCESSIVE_HOURS',  # Usar tipo existente más cercano
-                read=False,  # Corregir nombre del campo
-                related_object_id=schedule.id  # Usar el campo correcto
+                notification_type='SCHEDULE_NON_COMPLIANCE',  # Usar tipo específico
+                read=False,
+                related_object_id=schedule.id
             )
             notifications_created.append(notification)
         
@@ -189,9 +189,9 @@ class ScheduleComplianceMonitor:
         from datetime import timedelta
         
         current_time = timezone.now()
-        grace_period = timedelta(minutes=20)
+        grace_period = timedelta(minutes=5)
         
-        # Buscar turnos que deberían haber comenzado hace más de 20 minutos
+        # Buscar turnos que deberían haber comenzado hace más de 5 minutos
         overdue_schedules = Schedule.objects.filter(
             status=Schedule.ACTIVE,
             start_datetime__lt=current_time - grace_period,
@@ -207,7 +207,7 @@ class ScheduleComplianceMonitor:
             if compliance_result['status'] == 'non_compliant':
                 # Verificar si ya se generó notificación para este turno
                 existing_notification = Notification.objects.filter(
-                    notification_type='EXCESSIVE_HOURS',
+                    notification_type='SCHEDULE_NON_COMPLIANCE',
                     related_object_id=schedule.id
                 ).exists()
                 

@@ -14,6 +14,7 @@ class Notification(models.Model):
     ATTENDANCE = 'attendance'
     ADMIN_VERIFICATION = 'admin_verification'
     EXCESSIVE_HOURS = 'excessive_hours'
+    SCHEDULE_NON_COMPLIANCE = 'schedule_non_compliance'
     CONVERSATION_MESSAGE = 'conversation_message'
     
     TYPE_CHOICES = [
@@ -24,6 +25,7 @@ class Notification(models.Model):
         (ATTENDANCE, 'Listado de asistencia'),
         (ADMIN_VERIFICATION, 'Verificación de usuario'),
         (EXCESSIVE_HOURS, 'Exceso de horas continuas'),
+        (SCHEDULE_NON_COMPLIANCE, 'Incumplimiento de turno'),
         (CONVERSATION_MESSAGE, 'Nuevo mensaje en conversación'),
     ]
     

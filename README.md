@@ -36,6 +36,21 @@ python manage.py createsuperuser
 python manage.py runserver
 ```
 
+### **🧪 Configuración Rápida con Datos de Prueba**
+```bash
+# Opción 1: Script automatizado (Windows)
+setup_test_data.bat
+
+# Opción 2: Manual
+python manage.py shell < scripts/create_test_data.py
+```
+
+**Credenciales de prueba creadas:**
+- **Admin**: `admin_test` / `admin123`
+- **Monitor**: `monitor_test` / `monitor123`
+
+Ver `README_COURSES_TESTING.md` para guía completa de testing.
+
 ---
 
 ## 🔐 **Autenticación**
