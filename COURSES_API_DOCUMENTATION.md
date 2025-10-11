@@ -114,7 +114,6 @@ class CourseHistory(models.Model):
     "name": "Taller de Programación Avanzada",
     "description": "Curso intensivo de desarrollo backend",
     "room": 1,
-    "monitor": 2,
     "schedule": 3,
     "start_datetime": "2025-01-15T09:00:00Z",
     "end_datetime": "2025-01-15T12:00:00Z"
