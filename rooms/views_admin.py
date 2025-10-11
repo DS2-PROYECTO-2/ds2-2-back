@@ -221,16 +221,33 @@ def admin_entries_list(request):
             queryset = queryset.filter(exit_time__isnull=True)
         elif active.lower() == 'false':
             queryset = queryset.filter(exit_time__isnull=False)
+
+        if from_date and to_date:
+            # Caso 1: Ambas fechas presentes - filtrar por rango completo
+            try:
+                from datetime import datetime
+                from_date_obj = datetime.fromisoformat(from_date.replace('Z', '+00:00'))
+                to_date_obj = datetime.fromisoformat(to_date.replace('Z', '+00:00'))
+                
+                # Incluir desde from_date hasta to_date (ambos días)
+                queryset = queryset.filter(
+                    entry_time__date__gte=from_date_obj.date(),
+                    entry_time__date__lte=to_date_obj.date()
+                )
+            except ValueError:
+                pass
         
-        if from_date:
+        elif from_date:
+            # Caso 2: Solo fecha inicio - mostrar desde esa fecha en adelante
             try:
                 from datetime import datetime
                 from_date_obj = datetime.fromisoformat(from_date.replace('Z', '+00:00'))
                 queryset = queryset.filter(entry_time__gte=from_date_obj)
             except ValueError:
                 pass
-        
-        if to_date:
+
+        elif to_date:
+            # Caso 3: Solo fecha fin - mostrar hasta esa fecha
             try:
                 from datetime import datetime
                 to_date_obj = datetime.fromisoformat(to_date.replace('Z', '+00:00'))

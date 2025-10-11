@@ -102,9 +102,9 @@ class Command(BaseCommand):
         from schedule.services import ScheduleValidationService
         
         current_time = timezone.now()
-        grace_period = timedelta(minutes=20)
+        grace_period = timedelta(minutes=5)
         
-        # Buscar turnos que deberían haber comenzado hace más de 20 minutos
+        # Buscar turnos que deberían haber comenzado hace más de 5 minutos
         overdue_schedules = Schedule.objects.filter(
             status=Schedule.ACTIVE,
             start_datetime__lt=current_time - grace_period,
