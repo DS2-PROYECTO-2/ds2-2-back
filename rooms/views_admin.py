@@ -222,38 +222,82 @@ def admin_entries_list(request):
         elif active.lower() == 'false':
             queryset = queryset.filter(exit_time__isnull=False)
 
+        # FILTROS DE FECHA COMPLETOS (CORREGIDOS)
         if from_date and to_date:
             # Caso 1: Ambas fechas presentes - filtrar por rango completo
             try:
-                from datetime import datetime
-                from_date_obj = datetime.fromisoformat(from_date.replace('Z', '+00:00'))
-                to_date_obj = datetime.fromisoformat(to_date.replace('Z', '+00:00'))
+                from datetime import datetime, timezone
+                from django.utils import timezone as django_timezone
                 
-                # Incluir desde from_date hasta to_date (ambos días)
+                # Manejar diferentes formatos de fecha
+                if 'T' in from_date:
+                    from_date_obj = datetime.fromisoformat(from_date.replace('Z', '+00:00'))
+                else:
+                    from_date_obj = datetime.fromisoformat(f"{from_date}T00:00:00+00:00")
+                
+                if 'T' in to_date:
+                    to_date_obj = datetime.fromisoformat(to_date.replace('Z', '+00:00'))
+                else:
+                    to_date_obj = datetime.fromisoformat(f"{to_date}T23:59:59+00:00")
+                
+                # Asegurar que las fechas estén en UTC usando Django timezone
+                if from_date_obj.tzinfo is None:
+                    from_date_obj = django_timezone.make_aware(from_date_obj, timezone.utc)
+                if to_date_obj.tzinfo is None:
+                    to_date_obj = django_timezone.make_aware(to_date_obj, timezone.utc)
+                
+                # Configurar el rango completo del día
+                start_datetime = from_date_obj.replace(hour=0, minute=0, second=0, microsecond=0)
+                end_datetime = to_date_obj.replace(hour=23, minute=59, second=59, microsecond=999999)
+                
                 queryset = queryset.filter(
-                    entry_time__date__gte=from_date_obj.date(),
-                    entry_time__date__lte=to_date_obj.date()
+                    entry_time__gte=start_datetime,
+                    entry_time__lte=end_datetime
                 )
-            except ValueError:
+            except ValueError as e:
+                logger.warning(f"Error parsing date range: {e}")
                 pass
-        
         elif from_date:
             # Caso 2: Solo fecha inicio - mostrar desde esa fecha en adelante
             try:
-                from datetime import datetime
-                from_date_obj = datetime.fromisoformat(from_date.replace('Z', '+00:00'))
-                queryset = queryset.filter(entry_time__gte=from_date_obj)
-            except ValueError:
+                from datetime import datetime, timezone
+                from django.utils import timezone as django_timezone
+                
+                if 'T' in from_date:
+                    from_date_obj = datetime.fromisoformat(from_date.replace('Z', '+00:00'))
+                else:
+                    from_date_obj = datetime.fromisoformat(f"{from_date}T00:00:00+00:00")
+                
+                if from_date_obj.tzinfo is None:
+                    from_date_obj = django_timezone.make_aware(from_date_obj, timezone.utc)
+                
+                # Configurar inicio del día
+                start_datetime = from_date_obj.replace(hour=0, minute=0, second=0, microsecond=0)
+                queryset = queryset.filter(entry_time__gte=start_datetime)
+            except ValueError as e:
+                logger.warning(f"Error parsing from_date: {e}")
                 pass
-
         elif to_date:
             # Caso 3: Solo fecha fin - mostrar hasta esa fecha
             try:
-                from datetime import datetime
-                to_date_obj = datetime.fromisoformat(to_date.replace('Z', '+00:00'))
-                queryset = queryset.filter(entry_time__lte=to_date_obj)
-            except ValueError:
+                from datetime import datetime, timezone
+                from django.utils import timezone as django_timezone
+                
+                if 'T' in to_date:
+                    to_date_obj = datetime.fromisoformat(to_date.replace('Z', '+00:00'))
+                else:
+                    to_date_obj = datetime.fromisoformat(f"{to_date}T23:59:59+00:00")
+                
+                if to_date_obj.tzinfo is None:
+                    to_date_obj = django_timezone.make_aware(to_date_obj, timezone.utc)
+                
+                # Configurar final del día
+                end_datetime = to_date_obj.replace(hour=23, minute=59, second=59, microsecond=999999)
+                queryset = queryset.filter(entry_time__lte=end_datetime)
+            except ValueError as e:
+                logger.warning(f"Error parsing to_date: {e}")
                 pass
+        # Caso 4: Sin fechas - no aplicar filtros de fecha (mostrar todo)
         
         if document:
             queryset = queryset.filter(user__identification__icontains=document)
