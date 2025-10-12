@@ -1,5 +1,5 @@
 from django.urls import path
-from . import views, views_admin
+from . import views, views_admin, views_reports
 
 urlpatterns = [
     # Gestión de salas (Sprint 1)
@@ -30,4 +30,19 @@ urlpatterns = [
     # Endpoints admin adicionales
     path('entries/', views_admin.admin_entries_list, name='admin_entries_list'),
     path('entries/stats/', views_admin.admin_entries_stats, name='admin_entries_stats'),
+
+    ### *🔧 PASO 2: Modificar rooms/urls.py*
+
+    
+    # Endpoints de reportes con cálculos de superposición
+    path('reports/worked-hours/', views_reports.calculate_worked_hours, name='calculate_worked_hours'),
+    path('reports/late-arrivals/', views_reports.calculate_late_arrivals, name='calculate_late_arrivals'),
+    path('reports/stats/', views_reports.calculate_report_stats, name='calculate_report_stats'),
+    
+    # NUEVOS ENDPOINTS: Comparación turnos vs registros y validación de acceso anticipado
+    path('reports/turn-comparison/', views_reports.get_turn_comparison, name='get_turn_comparison'),
+    path('entry/validate/', views_reports.validate_entry_access, name='validate_entry_access'),
+    
+    # Sistema de reutilización de IDs
+    path('admin/id-statistics/', views_reports.get_id_statistics, name='get_id_statistics'),
 ]
