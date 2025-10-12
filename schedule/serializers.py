@@ -147,7 +147,8 @@ class MonitorScheduleSerializer(serializers.ModelSerializer):
     """
     Serializador para que los monitores vean sus propios turnos
     """
-    user = serializers.IntegerField(source='user.id', read_only=True)  
+    user = serializers.IntegerField(source='user.id', read_only=True) 
+    user_username = serializers.CharField(source='user.username', read_only=True) 
     room = serializers.IntegerField(source='room.id', read_only=True) 
     room_name = serializers.CharField(source='room.name', read_only=True)
     room_code = serializers.CharField(source='room.code', read_only=True)
@@ -160,7 +161,7 @@ class MonitorScheduleSerializer(serializers.ModelSerializer):
     class Meta:
         model = Schedule
         fields = [
-            'id', 'user', 'room', 'start_datetime', 'end_datetime', 'status', 'recurring', 'notes',
+            'id', 'user','user_username', 'room', 'start_datetime', 'end_datetime', 'status', 'recurring', 'notes',
             'room_name', 'room_code', 'room_description', 'duration_hours',
             'is_current', 'is_upcoming', 'has_compliance', 'created_at'
         ]

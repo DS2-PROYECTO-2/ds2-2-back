@@ -119,3 +119,29 @@ class RoomEntryExitSerializer(serializers.ModelSerializer):
                 instance.notes = validated_data['notes']
             instance.save()
         return instance
+
+
+# Serializers adicionales para reportes y estadísticas
+
+class TurnComparisonSerializer(serializers.Serializer):
+    """
+    Serializador para comparación de turnos vs registros
+    """
+    usuario = serializers.CharField()
+    turno = serializers.CharField()
+    registro = serializers.CharField()
+    diferencia = serializers.IntegerField()
+    diferencia_formateada = serializers.CharField()
+    estado = serializers.CharField()
+    notas = serializers.CharField()
+    sala = serializers.CharField()
+    fecha = serializers.CharField()
+
+
+class EntryValidationSerializer(serializers.Serializer):
+    """
+    Serializador para validación de acceso anticipado
+    """
+    permitido = serializers.BooleanField()
+    diferencia = serializers.FloatField()
+    mensaje = serializers.CharField()

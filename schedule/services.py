@@ -57,26 +57,58 @@ class ScheduleValidationService:
         
     @staticmethod  
     def validate_room_access_permission(user, room, access_datetime=None):
-        """Validate room access based on active schedule"""
+        """Validate room access based on active schedule with early access support"""
         if access_datetime is None:
             access_datetime = timezone.now()
         
         from .models import Schedule
         
-        active_schedule = Schedule.objects.filter(
+        # Buscar turnos del día actual
+        turnos_del_dia = Schedule.objects.filter(
             user=user,
             room=room,
             status=Schedule.ACTIVE,
+            start_datetime__date=access_datetime.date()
+        )
+        
+        if not turnos_del_dia.exists():
+            raise ValidationError({
+                "access_denied": f"El monitor {user.username} no tiene un turno asignado en la sala {room.name} para hoy.",
+                "current_time": access_datetime,
+                "room_code": room.code
+            })
+        
+        # Buscar turno activo en el momento exacto
+        active_schedule = turnos_del_dia.filter(
             start_datetime__lte=access_datetime,
             end_datetime__gte=access_datetime
         ).first()
         
+        # Si no hay turno activo, buscar turno futuro (para acceso anticipado)
         if not active_schedule:
-            raise ValidationError({
-                "access_denied": f"El monitor {user.username} no tiene un turno asignado en la sala {room.name} para el horario actual.",
-                "current_time": access_datetime,
-                "room_code": room.code
-            })
+            future_schedule = turnos_del_dia.filter(
+                start_datetime__gt=access_datetime
+            ).order_by('start_datetime').first()
+            
+            if future_schedule:
+                # Verificar si el acceso anticipado está permitido (máximo 10 minutos antes)
+                diferencia_minutos = (future_schedule.start_datetime - access_datetime).total_seconds() / 60
+                
+                if diferencia_minutos <= 10:
+                    return future_schedule  # Permitir acceso anticipado
+                else:
+                    raise ValidationError({
+                        "access_denied": f"Acceso muy anticipado. El turno inicia en {diferencia_minutos:.1f} minutos. Máximo 10 minutos antes.",
+                        "current_time": access_datetime,
+                        "room_code": room.code,
+                        "next_schedule": future_schedule.start_datetime
+                    })
+            else:
+                raise ValidationError({
+                    "access_denied": f"El monitor {user.username} no tiene un turno asignado en la sala {room.name} para el horario actual.",
+                    "current_time": access_datetime,
+                    "room_code": room.code
+                })
         
         return active_schedule
     

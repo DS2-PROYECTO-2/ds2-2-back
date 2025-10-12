@@ -123,3 +123,20 @@ class RoomEntry(models.Model):
         if hours > 0:
             return f"{hours}h {minutes}m"
         return f"{minutes}m"
+    
+    @classmethod
+    def create_with_reused_id(cls, **kwargs):
+        """
+        Crea una nueva entrada reutilizando IDs disponibles
+        Utiliza el sistema de reutilización de IDs para optimizar la base de datos
+        """
+        from .id_reuse import RoomEntryIDManager
+        return RoomEntryIDManager.create_with_reused_id(**kwargs)
+    
+    @classmethod
+    def get_id_statistics(cls):
+        """
+        Obtiene estadísticas sobre el uso de IDs en este modelo
+        """
+        from .id_reuse import RoomEntryIDManager
+        return RoomEntryIDManager.get_room_entry_stats()

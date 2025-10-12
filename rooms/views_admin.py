@@ -6,6 +6,7 @@ from django.db.models import Q
 from django.core.paginator import Paginator
 from users.permissions import IsAdminUser
 from .models import Room, RoomEntry
+from .serializers import RoomEntrySerializer
 from django.shortcuts import get_object_or_404
 import logging
 
@@ -177,39 +178,24 @@ def admin_room_delete(request, room_id):
 @permission_classes([IsAdminUser])
 def admin_entries_list(request):
     """
-    Lista todas las entradas con filtros para administradores
+    Listar todas las entradas para administradores con filtros
     """
     try:
         # Obtener parámetros de filtro
         user_name = request.GET.get('user_name', '').strip()
         room_id = request.GET.get('room', '').strip()
-        active = request.GET.get('active', '').strip()
         from_date = request.GET.get('from', '').strip()
         to_date = request.GET.get('to', '').strip()
-        document = request.GET.get('document', '').strip()
-        # Manejo robusto de paginación cuando vienen vacíos o inválidos
-        page_raw = request.GET.get('page', '').strip()
-        page_size_raw = request.GET.get('page_size', '').strip()
-        try:
-            page = int(page_raw) if page_raw else 1
-        except ValueError:
-            page = 1
-        try:
-            page_size = int(page_size_raw) if page_size_raw else 20
-        except ValueError:
-            page_size = 20
+        active_status = request.GET.get('active', '').strip()
         
-        # Construir queryset base
-        queryset = RoomEntry.objects.select_related('user', 'room').order_by('-entry_time')
+        # Obtener todas las entradas
+        queryset = RoomEntry.objects.select_related('user', 'room').all()
         
-        # Aplicar filtros
+        # FILTRO POR NOMBRE DE USUARIO
         if user_name:
-            queryset = queryset.filter(
-                Q(user__first_name__icontains=user_name) |
-                Q(user__last_name__icontains=user_name) |
-                Q(user__username__icontains=user_name)
-            )
+            queryset = queryset.filter(user__username__icontains=user_name)
         
+        # FILTRO POR SALA
         if room_id:
             try:
                 room_id_int = int(room_id)
@@ -217,38 +203,37 @@ def admin_entries_list(request):
             except ValueError:
                 pass
         
-        if active.lower() == 'true':
-            queryset = queryset.filter(exit_time__isnull=True)
-        elif active.lower() == 'false':
-            queryset = queryset.filter(exit_time__isnull=False)
-
         # FILTROS DE FECHA COMPLETOS (CORREGIDOS)
         if from_date and to_date:
             # Caso 1: Ambas fechas presentes - filtrar por rango completo
             try:
                 from datetime import datetime, timezone
-                from django.utils import timezone as django_timezone
-                
                 # Manejar diferentes formatos de fecha
                 if 'T' in from_date:
                     from_date_obj = datetime.fromisoformat(from_date.replace('Z', '+00:00'))
                 else:
-                    from_date_obj = datetime.fromisoformat(f"{from_date}T00:00:00+00:00")
+                    from_date_obj = datetime.fromisoformat(from_date)
                 
                 if 'T' in to_date:
                     to_date_obj = datetime.fromisoformat(to_date.replace('Z', '+00:00'))
                 else:
-                    to_date_obj = datetime.fromisoformat(f"{to_date}T23:59:59+00:00")
+                    to_date_obj = datetime.fromisoformat(to_date)
                 
-                # Asegurar que las fechas estén en UTC usando Django timezone
+                # Asegurar que las fechas estén en UTC
                 if from_date_obj.tzinfo is None:
-                    from_date_obj = django_timezone.make_aware(from_date_obj, timezone.utc)
+                    from_date_obj = from_date_obj.replace(tzinfo=timezone.utc)
                 if to_date_obj.tzinfo is None:
-                    to_date_obj = django_timezone.make_aware(to_date_obj, timezone.utc)
+                    to_date_obj = to_date_obj.replace(tzinfo=timezone.utc)
                 
-                # Configurar el rango completo del día
+                # Usar filtro por rango de datetime naive para evitar problemas de zona horaria
                 start_datetime = from_date_obj.replace(hour=0, minute=0, second=0, microsecond=0)
                 end_datetime = to_date_obj.replace(hour=23, minute=59, second=59, microsecond=999999)
+                
+                # Convertir a naive datetime para evitar problemas de zona horaria
+                if start_datetime.tzinfo is not None:
+                    start_datetime = start_datetime.replace(tzinfo=None)
+                if end_datetime.tzinfo is not None:
+                    end_datetime = end_datetime.replace(tzinfo=None)
                 
                 queryset = queryset.filter(
                     entry_time__gte=start_datetime,
@@ -261,18 +246,18 @@ def admin_entries_list(request):
             # Caso 2: Solo fecha inicio - mostrar desde esa fecha en adelante
             try:
                 from datetime import datetime, timezone
-                from django.utils import timezone as django_timezone
-                
                 if 'T' in from_date:
                     from_date_obj = datetime.fromisoformat(from_date.replace('Z', '+00:00'))
                 else:
-                    from_date_obj = datetime.fromisoformat(f"{from_date}T00:00:00+00:00")
+                    from_date_obj = datetime.fromisoformat(from_date)
                 
                 if from_date_obj.tzinfo is None:
-                    from_date_obj = django_timezone.make_aware(from_date_obj, timezone.utc)
+                    from_date_obj = from_date_obj.replace(tzinfo=timezone.utc)
                 
-                # Configurar inicio del día
+                # Usar filtro por datetime naive en lugar de date
                 start_datetime = from_date_obj.replace(hour=0, minute=0, second=0, microsecond=0)
+                if start_datetime.tzinfo is not None:
+                    start_datetime = start_datetime.replace(tzinfo=None)
                 queryset = queryset.filter(entry_time__gte=start_datetime)
             except ValueError as e:
                 logger.warning(f"Error parsing from_date: {e}")
@@ -281,63 +266,62 @@ def admin_entries_list(request):
             # Caso 3: Solo fecha fin - mostrar hasta esa fecha
             try:
                 from datetime import datetime, timezone
-                from django.utils import timezone as django_timezone
-                
                 if 'T' in to_date:
                     to_date_obj = datetime.fromisoformat(to_date.replace('Z', '+00:00'))
                 else:
-                    to_date_obj = datetime.fromisoformat(f"{to_date}T23:59:59+00:00")
+                    to_date_obj = datetime.fromisoformat(to_date)
                 
                 if to_date_obj.tzinfo is None:
-                    to_date_obj = django_timezone.make_aware(to_date_obj, timezone.utc)
+                    to_date_obj = to_date_obj.replace(tzinfo=timezone.utc)
                 
-                # Configurar final del día
+                # Usar filtro por datetime naive en lugar de date
                 end_datetime = to_date_obj.replace(hour=23, minute=59, second=59, microsecond=999999)
+                if end_datetime.tzinfo is not None:
+                    end_datetime = end_datetime.replace(tzinfo=None)
                 queryset = queryset.filter(entry_time__lte=end_datetime)
             except ValueError as e:
                 logger.warning(f"Error parsing to_date: {e}")
                 pass
         # Caso 4: Sin fechas - no aplicar filtros de fecha (mostrar todo)
         
-        if document:
-            queryset = queryset.filter(user__identification__icontains=document)
+        # FILTRO POR ESTADO ACTIVO
+        if active_status == 'true':
+            queryset = queryset.filter(exit_time__isnull=True)
+        elif active_status == 'false':
+            queryset = queryset.filter(exit_time__isnull=False)
+        
+        # Ordenar por fecha de entrada (más recientes primero)
+        queryset = queryset.order_by('-entry_time')
         
         # Paginación
-        paginator = Paginator(queryset, page_size)
-        page_obj = paginator.get_page(page)
+        paginator = Paginator(queryset, 20)  # 20 entradas por página
+        page_number = request.GET.get('page')
+        page_obj = paginator.get_page(page_number)
         
         # Serializar datos
-        entries_data = []
-        for entry in page_obj:
-            entry_data = {
-                'id': entry.id,
-                'room': entry.room.id,
-                'room_name': entry.room.name,
-                'entry_time': entry.entry_time.isoformat(),
-                'exit_time': entry.exit_time.isoformat() if entry.exit_time else None,
-                'user': entry.user.id,
-                'user_name': entry.user.get_full_name(),
-                'user_username': entry.user.username,
-                'user_identification': entry.user.identification,
-                'notes': entry.notes,
-                'is_active': entry.exit_time is None
-            }
-            entries_data.append(entry_data)
+        serializer = RoomEntrySerializer(page_obj, many=True)
         
         return Response({
+            'results': serializer.data,
             'count': paginator.count,
-            'entries': entries_data,
-            'page': page,
-            'page_size': page_size,
-            'total_pages': paginator.num_pages,
+            'num_pages': paginator.num_pages,
+            'current_page': page_obj.number,
             'has_next': page_obj.has_next(),
-            'has_previous': page_obj.has_previous()
+            'has_previous': page_obj.has_previous(),
+            'filters_applied': {
+                'user_name': user_name,
+                'room_id': room_id,
+                'from_date': from_date,
+                'to_date': to_date,
+                'active_status': active_status
+            }
         }, status=status.HTTP_200_OK)
         
     except Exception as e:
-        logger.error(f"Error en admin_entries_list: {e}")
+        logger.error(f"Error en list_entries: {e}")
         return Response({
-            'error': str(e)
+            'error': 'Error al obtener entradas',
+            'details': str(e)
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
