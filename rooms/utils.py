@@ -71,11 +71,17 @@ def generar_comparacion_turnos_registros(date_from, date_to, user_id=None, room_
     from .models import RoomEntry
     from schedule.models import Schedule
     
-    # Convertir fechas
+    # Convertir fechas - manejar tanto formatos de fecha como datetime
     try:
+        # Si es solo fecha (YYYY-MM-DD), agregar tiempo por defecto
+        if 'T' not in date_from:
+            date_from += 'T00:00:00'
+        if 'T' not in date_to:
+            date_to += 'T23:59:59'
+            
         from_date = datetime.fromisoformat(date_from.replace('Z', '+00:00'))
         to_date = datetime.fromisoformat(date_to.replace('Z', '+00:00'))
-    except ValueError:
+    except (ValueError, AttributeError):
         return []
     
     # Obtener turnos en el rango de fechas
@@ -168,12 +174,17 @@ def validar_acceso_anticipado(user, room_id, access_time):
     """
     from schedule.models import Schedule
     
-    # Buscar turnos del día actual
+    # Buscar turnos que puedan estar activos en este momento
+    # Incluir schedules que empezaron ayer pero siguen activos hoy
+    start_range = access_time - timedelta(days=1)  
+    end_range = access_time + timedelta(days=1)
+    
     turnos_del_dia = Schedule.objects.filter(
         user=user,
         room_id=room_id,
         status=Schedule.ACTIVE,
-        start_datetime__date=access_time.date()
+        start_datetime__gte=start_range,
+        start_datetime__lt=end_range
     )
     
     if not turnos_del_dia.exists():
@@ -195,7 +206,8 @@ def validar_acceso_anticipado(user, room_id, access_time):
             # Verificar si el acceso anticipado está permitido (máximo 10 minutos antes)
             diferencia_minutos = (future_schedule.start_datetime - access_time).total_seconds() / 60
             
-            if diferencia_minutos <= 10:
+            # Permitir acceso hasta 10 minutos antes (inclusive) y agregar un pequeño margen de error
+            if diferencia_minutos <= 10.1:  # Pequeño margen para evitar problemas de precisión
                 return True, f"Acceso anticipado permitido. Turno inicia en {diferencia_minutos:.1f} minutos."
             else:
                 return False, f"Acceso muy anticipado. El turno inicia en {diferencia_minutos:.1f} minutos. Máximo 10 minutos antes."

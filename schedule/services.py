@@ -1,6 +1,7 @@
 ﻿# Schedule Services - Clean Version
 from django.utils import timezone
 from django.core.exceptions import ValidationError
+from datetime import timedelta
 
 class ScheduleValidationService:
     """
@@ -63,12 +64,17 @@ class ScheduleValidationService:
         
         from .models import Schedule
         
-        # Buscar turnos del día actual
+        # Buscar turnos que puedan estar activos en este momento
+        # Incluir schedules que empezaron ayer pero siguen activos hoy
+        start_range = access_datetime - timedelta(days=1)
+        end_range = access_datetime + timedelta(days=1)
+        
         turnos_del_dia = Schedule.objects.filter(
             user=user,
             room=room,
             status=Schedule.ACTIVE,
-            start_datetime__date=access_datetime.date()
+            start_datetime__gte=start_range,
+            start_datetime__lt=end_range
         )
         
         if not turnos_del_dia.exists():

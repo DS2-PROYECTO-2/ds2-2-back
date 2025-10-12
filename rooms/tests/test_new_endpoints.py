@@ -114,14 +114,22 @@ class NewEndpointsTest(TestCase):
         self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.monitor_token.key}')
         
         # Crear schedule futuro (para probar acceso anticipado)
-        Schedule.objects.create(
+        start_time = timezone.now() + timedelta(minutes=5)
+        end_time = start_time + timedelta(hours=4)
+        
+        schedule = Schedule.objects.create(
             user=self.monitor,
             room=self.room,
-            start_datetime=timezone.now() + timedelta(minutes=5),
-            end_datetime=timezone.now() + timedelta(hours=4, minutes=5),
+            start_datetime=start_time,
+            end_datetime=end_time,
             status=Schedule.ACTIVE,
             created_by=self.admin
         )
+        
+        # Verificar que el schedule se creó correctamente
+        self.assertIsNotNone(schedule)
+        self.assertEqual(schedule.user, self.monitor)
+        self.assertEqual(schedule.room, self.room)
         
         # Hacer request
         url = reverse('validate_entry_access')
