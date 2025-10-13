@@ -34,7 +34,12 @@ if not User.objects.filter(is_superuser=True).exists():
     User.objects.create_superuser(
         username='admin',
         email='admin@ds2-backend.onrender.com',
-        password='admin123456'
+        password='admin123456',
+        identification='0000000000',
+        first_name='Admin',
+        last_name='User',
+        phone='0000000000',
+        role='admin'
     )
     print('Superuser created: admin/admin123456')
 else:

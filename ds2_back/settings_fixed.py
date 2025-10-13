@@ -15,8 +15,6 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
-
-
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -30,15 +28,9 @@ environ.Env.read_env(BASE_DIR / '.env')  # Carga el .env de la raíz del proyect
 SECRET_KEY = env('SECRET_KEY', default='django-insecure-oqquaff+@v#nz5%0ujbfzn0k7z=&%^&&zgnz#x9^203qc-ej_!')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = env.bool('DEBUG', default=True)
 
-ALLOWED_HOSTS = [
-    '127.0.0.1',
-    'localhost',
-    'testserver',
-    'ds2-backend.onrender.com',
-]
-
+ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=['127.0.0.1', 'localhost', 'testserver'])
 
 # Application definition
 
@@ -99,13 +91,10 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'ds2_back.wsgi.application'
 
-
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
-import sys
-
-# Configuración condicional de base de datos
+# Configuración simplificada de base de datos
 if 'test' in sys.argv or 'pytest' in sys.modules:
     # SQLite para tests (más rápido y no requiere servidor PostgreSQL)
     DATABASES = {
@@ -125,24 +114,16 @@ else:
         DATABASES = {
             'default': env.db(),
         }
-    elif env.str('DB_NAME', default=''):
-        # Usar PostgreSQL local si está configurado (para desarrollo con pgAdmin)
+    else:
+        # Fallback para desarrollo local con variables individuales
         DATABASES = {
             'default': {
                 'ENGINE': 'django.db.backends.postgresql',
-                'NAME': env('DB_NAME'),
+                'NAME': env('DB_NAME', default='ds2_db'),
                 'USER': env('DB_USER', default='postgres'),
                 'PASSWORD': env('DB_PASSWORD', default=''),
                 'HOST': env('DB_HOST', default='localhost'),
                 'PORT': env('DB_PORT', default='5432'),
-            }
-        }
-    else:
-        # Fallback para desarrollo local con SQLite
-        DATABASES = {
-            'default': {
-                'ENGINE': 'django.db.backends.sqlite3',
-                'NAME': BASE_DIR / 'db.sqlite3',
             }
         }
 
@@ -164,7 +145,6 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
-
 # Internationalization
 # https://docs.djangoproject.com/en/5.2/topics/i18n/
 
@@ -176,11 +156,11 @@ USE_I18N = True
 
 USE_TZ = True
 
-
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
 STATIC_URL = 'static/'
+STATIC_ROOT = env('STATIC_ROOT', default=os.path.join(BASE_DIR, 'staticfiles'))
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
@@ -220,15 +200,9 @@ CORS_ALLOWED_ORIGINS = [
     "http://127.0.0.1:4200",
     "http://localhost:5173",  # Vite/React
     "http://127.0.0.1:5173",
-    "https://ds2-2-front.vercel.app",  # Frontend en Vercel
 ]
 
 CORS_ALLOW_CREDENTIALS = True
-
-# Frontend de confianza para CSRF (si en el futuro se usan formularios/CSRF)
-CSRF_TRUSTED_ORIGINS = [
-    'https://ds2-2-front.vercel.app',
-]
 
 # Media files configuration
 MEDIA_URL = '/media/'
@@ -244,9 +218,8 @@ EMAIL_USE_TLS = True
 EMAIL_HOST_USER = env('EMAIL_HOST_USER', default='sado56hdgm@gmail.com')
 EMAIL_HOST_PASSWORD = env('EMAIL_HOST_PASSWORD', default='orfl vkzn dern pbos')
 DEFAULT_FROM_EMAIL = env('DEFAULT_FROM_EMAIL', default='Soporte DS2 <sado56hdgm@gmail.com>')
+
 # URL pública base para construir enlaces en correos
 PUBLIC_BASE_URL = env('PUBLIC_BASE_URL', default='http://localhost:8000')
 # URL del frontend para enlaces de reset de contraseña
 FRONTEND_BASE_URL = env('FRONTEND_BASE_URL', default='http://localhost:5173')
-# Static files configuration for production
-STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
