@@ -278,4 +278,4 @@ PUBLIC_BASE_URL = "http://localhost:8000"
 # URL del frontend para enlaces de reset de contraseña
 FRONTEND_BASE_URL = "http://localhost:5173"
 # Static files configuration for production
-STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+STATIC_ROOT = BASE_DIR / 'staticfiles'
