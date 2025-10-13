@@ -15,7 +15,7 @@ Todos los endpoints de administración requieren:
 
 ---
 
-## 1. 📖 **Listar Salas** → `GET` - Obtener todas las salas
+## 1. 📖 **Listar Salas** 
 ```
 GET /api/rooms/admin/rooms/
 ```
@@ -60,7 +60,7 @@ GET /api/rooms/admin/rooms/?search=Laboratorio&include_inactive=true
 
 ---
 
-## 2. ➕ **Crear Sala** → `POST` - Crear nueva sala
+## 2. ➕ **Crear Sala**
 ```
 POST /api/rooms/admin/rooms/create/
 ```
@@ -108,7 +108,7 @@ Content-Type: application/json
 
 ---
 
-## 3. 🔍 **Ver Detalle de Sala** → `GET` - Detalle y estadísticas
+## 3. 🔍 **Ver Detalle de Sala**
 ```
 GET /api/rooms/admin/rooms/{room_id}/
 ```
@@ -153,7 +153,7 @@ Authorization: Token <admin_token>
 
 ---
 
-## 4. ✏️ **Actualizar Sala** → `PUT/PATCH` - Modificar sala existente
+## 4. ✏️ **Actualizar Sala**
 ```
 PUT /api/rooms/admin/rooms/{room_id}/update/
 PATCH /api/rooms/admin/rooms/{room_id}/update/

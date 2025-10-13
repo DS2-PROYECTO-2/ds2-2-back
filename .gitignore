@@ -1,9 +1,60 @@
-db.sqlite3
+# Python
 __pycache__/
-*.pyc
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Django
+*.log
 db.sqlite3
-__pycache__/
-*.pyc
-db.sqlite3
-__pycache__/
-*.pyc
+db.sqlite3-journal
+/staticfiles/
+/static/
+/media/
+.env
+.env.local
+.env.*.local
+local_settings.py
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Testing
+.coverage
+.pytest_cache/
+htmlcov/
+.tox/
+.hypothesis/
+
+# Backups
+*.bak
+*.sql
+*.dump
+
+# Temporary files
+*.tmp
+.cache/
