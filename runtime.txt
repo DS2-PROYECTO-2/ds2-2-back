@@ -1,4 +1,0 @@
-# Runtime specification for Render deployment
-# This file specifies the Python version to use
-
-python-3.11.9
