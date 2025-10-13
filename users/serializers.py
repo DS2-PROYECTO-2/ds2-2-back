@@ -58,11 +58,34 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
         validated_data.pop('password_confirm')
         password = validated_data.pop('password')
         
-        user = User.objects.create_user(
-            password=password,
-            **validated_data
-        )
-        return user
+        try:
+            user = User.objects.create_user(
+                password=password,
+                **validated_data
+            )
+            return user
+        except Exception as e:
+            # Si hay un IntegrityError, verificar qué campo está duplicado
+            if 'IntegrityError' in str(type(e)):
+                # Verificar cada campo único
+                if User.objects.filter(identification=validated_data.get('identification')).exists():
+                    raise serializers.ValidationError({
+                        'identification': ['Ya existe un usuario con esta identificación']
+                    })
+                elif User.objects.filter(username=validated_data.get('username')).exists():
+                    raise serializers.ValidationError({
+                        'username': ['Ya existe un usuario con este nombre de usuario']
+                    })
+                elif User.objects.filter(email=validated_data.get('email')).exists():
+                    raise serializers.ValidationError({
+                        'email': ['Ya existe un usuario con este email']
+                    })
+                else:
+                    raise serializers.ValidationError({
+                        'non_field_errors': ['Error de integridad de datos. Verifica que todos los campos sean únicos.']
+                    })
+            else:
+                raise e
 
 
 class UserLoginSerializer(serializers.Serializer):

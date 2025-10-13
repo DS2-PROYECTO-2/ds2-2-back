@@ -6,7 +6,7 @@ Django==4.2.16
 djangorestframework==3.14.0
 
 # Database
-psycopg2-binary==2.9.9  # PostgreSQL adapter
+psycopg==3.2.10  # PostgreSQL adapter
 django-cors-headers==4.3.1  # CORS handling
 
 # Authentication & Security
@@ -28,7 +28,7 @@ django-extensions==3.2.3  # Extended management commands
 # Utilities
 python-decouple==3.8  # Environment variables
 pytz==2023.3  # Timezone handling
-Pillow==10.1.0  # Image processing
+#Pillow==10.1.0  # Image processing
 
 # Production
 gunicorn==21.2.0  # WSGI server

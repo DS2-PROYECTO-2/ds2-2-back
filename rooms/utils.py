@@ -64,6 +64,24 @@ def formatear_diferencia(diferencia_minutos):
     else:
         return str(diferencia_minutos)  # Con símbolo negativo
 
+def convert_to_bogota(dt):
+    """
+    Convierte un datetime a zona horaria de Bogotá
+    
+    Args:
+        dt: datetime object (con o sin zona horaria)
+        
+    Returns:
+        datetime object en zona horaria de Bogotá
+    """
+    if dt is None:
+        return None
+    
+    if dt.tzinfo is None:
+        return BOGOTA_TZ.localize(dt)
+    else:
+        return dt.astimezone(BOGOTA_TZ)
+
 def generar_comparacion_turnos_registros(date_from, date_to, user_id=None, room_id=None):
     """
     Genera comparación entre turnos asignados y registros reales
@@ -79,8 +97,20 @@ def generar_comparacion_turnos_registros(date_from, date_to, user_id=None, room_
         if 'T' not in date_to:
             date_to += 'T23:59:59'
             
+        # Parsear fechas y convertir a zona horaria de Bogotá
         from_date = datetime.fromisoformat(date_from.replace('Z', '+00:00'))
         to_date = datetime.fromisoformat(date_to.replace('Z', '+00:00'))
+        
+        # Convertir a zona horaria de Bogotá
+        if from_date.tzinfo is None:
+            from_date = BOGOTA_TZ.localize(from_date)
+        else:
+            from_date = from_date.astimezone(BOGOTA_TZ)
+            
+        if to_date.tzinfo is None:
+            to_date = BOGOTA_TZ.localize(to_date)
+        else:
+            to_date = to_date.astimezone(BOGOTA_TZ)
     except (ValueError, AttributeError):
         return []
     
@@ -142,28 +172,35 @@ def generar_comparacion_turnos_registros(date_from, date_to, user_id=None, room_
             estado = clasificar_estado(diferencia)
             diferencia_formateada = formatear_diferencia(diferencia)
             
+            # Convertir fechas a zona horaria de Bogotá para mostrar
+            turno_bogota = convert_to_bogota(turno.start_datetime)
+            registro_bogota = convert_to_bogota(registro.entry_time)
+            
             comparaciones.append({
                 'usuario': turno.user.username,
-                'turno': turno.start_datetime.strftime('%H:%M'),
-                'registro': registro.entry_time.strftime('%H:%M'),
+                'turno': turno_bogota.strftime('%H:%M'),
+                'registro': registro_bogota.strftime('%H:%M'),
                 'diferencia': int(diferencia),
                 'diferencia_formateada': diferencia_formateada,
                 'estado': estado,
                 'notas': registro.notes or '',
                 'sala': turno.room.name,
-                'fecha': turno.start_datetime.strftime('%Y-%m-%d')
+                'fecha': turno_bogota.strftime('%Y-%m-%d')
             })
         else:
+            # Convertir fecha del turno a zona horaria de Bogotá para mostrar
+            turno_bogota = convert_to_bogota(turno.start_datetime)
+            
             comparaciones.append({
                 'usuario': turno.user.username,
-                'turno': turno.start_datetime.strftime('%H:%M'),
+                'turno': turno_bogota.strftime('%H:%M'),
                 'registro': 'Sin registro',
                 'diferencia': 0,
                 'diferencia_formateada': '0',
                 'estado': 'SIN_REGISTRO',
                 'notas': '',
                 'sala': turno.room.name,
-                'fecha': turno.start_datetime.strftime('%Y-%m-%d')
+                'fecha': turno_bogota.strftime('%Y-%m-%d')
             })
     
     return comparaciones
@@ -215,3 +252,10 @@ def validar_acceso_anticipado(user, room_id, access_time):
             return False, f"El monitor {user.username} no tiene un turno asignado en la sala {room_id} para el horario actual."
     
     return True, "Acceso permitido durante el turno activo."
+
+
+def es_mismo_dia(fecha1, fecha2):
+    """
+    Verifica si dos fechas son del mismo día
+    """
+    return fecha1.date() == fecha2.date()

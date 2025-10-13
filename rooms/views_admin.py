@@ -187,6 +187,7 @@ def admin_entries_list(request):
         from_date = request.GET.get('from', '').strip()
         to_date = request.GET.get('to', '').strip()
         active_status = request.GET.get('active', '').strip()
+        document = request.GET.get('document', '').strip()
         
         # Obtener todas las entradas
         queryset = RoomEntry.objects.select_related('user', 'room').all()
@@ -194,6 +195,10 @@ def admin_entries_list(request):
         # FILTRO POR NOMBRE DE USUARIO
         if user_name:
             queryset = queryset.filter(user__username__icontains=user_name)
+        
+        # FILTRO POR DOCUMENTO DE USUARIO
+        if document:
+            queryset = queryset.filter(user__identification__icontains=document)
         
         # FILTRO POR SALA
         if room_id:
@@ -313,12 +318,163 @@ def admin_entries_list(request):
                 'room_id': room_id,
                 'from_date': from_date,
                 'to_date': to_date,
-                'active_status': active_status
+                'active_status': active_status,
+                'document': document
             }
         }, status=status.HTTP_200_OK)
         
     except Exception as e:
         logger.error(f"Error en list_entries: {e}")
+        return Response({
+            'error': 'Error al obtener entradas',
+            'details': str(e)
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['GET'])
+@authentication_classes([TokenAuthentication])
+@permission_classes([IsAdminUser])
+def admin_entries_unpaginated(request):
+    """
+    Listar todas las entradas para administradores sin paginación
+    Compatible con frontend que necesita obtener todas las entradas
+    """
+    try:
+        # Obtener parámetros de filtro
+        user_name = request.GET.get('user_name', '').strip()
+        room_id = request.GET.get('room', '').strip()
+        from_date = request.GET.get('from', '').strip()
+        to_date = request.GET.get('to', '').strip()
+        active_status = request.GET.get('active', '').strip()
+        document = request.GET.get('document', '').strip()
+        
+        # Obtener todas las entradas
+        queryset = RoomEntry.objects.select_related('user', 'room').all()
+        
+        # FILTRO POR NOMBRE DE USUARIO
+        if user_name:
+            queryset = queryset.filter(user__username__icontains=user_name)
+        
+        # FILTRO POR DOCUMENTO DE USUARIO
+        if document:
+            queryset = queryset.filter(user__identification__icontains=document)
+        
+        # FILTRO POR SALA
+        if room_id:
+            try:
+                room_id_int = int(room_id)
+                queryset = queryset.filter(room_id=room_id_int)
+            except ValueError:
+                pass
+        
+        # FILTROS DE FECHA COMPLETOS (CORREGIDOS)
+        if from_date and to_date:
+            # Caso 1: Ambas fechas presentes - filtrar por rango completo
+            try:
+                from datetime import datetime, timezone
+                # Manejar diferentes formatos de fecha
+                if 'T' in from_date:
+                    from_date_obj = datetime.fromisoformat(from_date.replace('Z', '+00:00'))
+                else:
+                    from_date_obj = datetime.fromisoformat(from_date)
+                
+                if 'T' in to_date:
+                    to_date_obj = datetime.fromisoformat(to_date.replace('Z', '+00:00'))
+                else:
+                    to_date_obj = datetime.fromisoformat(to_date)
+                
+                # Asegurar que las fechas estén en UTC
+                if from_date_obj.tzinfo is None:
+                    from_date_obj = from_date_obj.replace(tzinfo=timezone.utc)
+                if to_date_obj.tzinfo is None:
+                    to_date_obj = to_date_obj.replace(tzinfo=timezone.utc)
+                
+                # Usar filtro por rango de datetime naive para evitar problemas de zona horaria
+                start_datetime = from_date_obj.replace(hour=0, minute=0, second=0, microsecond=0)
+                end_datetime = to_date_obj.replace(hour=23, minute=59, second=59, microsecond=999999)
+                
+                # Convertir a naive datetime para evitar problemas de zona horaria
+                if start_datetime.tzinfo is not None:
+                    start_datetime = start_datetime.replace(tzinfo=None)
+                if end_datetime.tzinfo is not None:
+                    end_datetime = end_datetime.replace(tzinfo=None)
+                
+                queryset = queryset.filter(
+                    entry_time__gte=start_datetime,
+                    entry_time__lte=end_datetime
+                )
+            except ValueError as e:
+                logger.warning(f"Error parsing date range: {e}")
+                pass
+        elif from_date:
+            # Caso 2: Solo fecha inicio - mostrar desde esa fecha en adelante
+            try:
+                from datetime import datetime, timezone
+                if 'T' in from_date:
+                    from_date_obj = datetime.fromisoformat(from_date.replace('Z', '+00:00'))
+                else:
+                    from_date_obj = datetime.fromisoformat(from_date)
+                
+                if from_date_obj.tzinfo is None:
+                    from_date_obj = from_date_obj.replace(tzinfo=timezone.utc)
+                
+                # Usar filtro por datetime naive en lugar de date
+                start_datetime = from_date_obj.replace(hour=0, minute=0, second=0, microsecond=0)
+                if start_datetime.tzinfo is not None:
+                    start_datetime = start_datetime.replace(tzinfo=None)
+                queryset = queryset.filter(entry_time__gte=start_datetime)
+            except ValueError as e:
+                logger.warning(f"Error parsing from_date: {e}")
+                pass
+        elif to_date:
+            # Caso 3: Solo fecha fin - mostrar hasta esa fecha
+            try:
+                from datetime import datetime, timezone
+                if 'T' in to_date:
+                    to_date_obj = datetime.fromisoformat(to_date.replace('Z', '+00:00'))
+                else:
+                    to_date_obj = datetime.fromisoformat(to_date)
+                
+                if to_date_obj.tzinfo is None:
+                    to_date_obj = to_date_obj.replace(tzinfo=timezone.utc)
+                
+                # Usar filtro por datetime naive en lugar de date
+                end_datetime = to_date_obj.replace(hour=23, minute=59, second=59, microsecond=999999)
+                if end_datetime.tzinfo is not None:
+                    end_datetime = end_datetime.replace(tzinfo=None)
+                queryset = queryset.filter(entry_time__lte=end_datetime)
+            except ValueError as e:
+                logger.warning(f"Error parsing to_date: {e}")
+                pass
+        # Caso 4: Sin fechas - no aplicar filtros de fecha (mostrar todo)
+        
+        # FILTRO POR ESTADO ACTIVO
+        if active_status == 'true':
+            queryset = queryset.filter(exit_time__isnull=True)
+        elif active_status == 'false':
+            queryset = queryset.filter(exit_time__isnull=False)
+        
+        # Ordenar por fecha de entrada (más recientes primero)
+        queryset = queryset.order_by('-entry_time')
+        
+        # Serializar datos SIN paginación
+        serializer = RoomEntrySerializer(queryset, many=True)
+        
+        return Response({
+            'entries': serializer.data,
+            'count': queryset.count(),
+            'filters_applied': {
+                'user_name': user_name,
+                'room_id': room_id,
+                'from_date': from_date,
+                'to_date': to_date,
+                'active_status': active_status,
+                'document': document
+            }
+        }, status=status.HTTP_200_OK)
+        
+    except Exception as e:
+        logger.error(f"Error en admin_entries_unpaginated: {e}")
         return Response({
             'error': 'Error al obtener entradas',
             'details': str(e)

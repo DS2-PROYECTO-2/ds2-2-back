@@ -28,8 +28,9 @@ urlpatterns = [
     path('admin/rooms/<int:room_id>/delete/', views_admin.admin_room_delete, name='admin_room_delete'), # DELETE - Eliminar sala (admin)
 
     # Endpoints admin adicionales
-    path('entries/', views_admin.admin_entries_list, name='admin_entries_list'),
+    path('entries/', views_admin.admin_entries_unpaginated, name='admin_entries_unpaginated'),
     path('entries/stats/', views_admin.admin_entries_stats, name='admin_entries_stats'),
+    path('admin/entries/', views_admin.admin_entries_list, name='admin_entries_list'),
 
     ### *🔧 PASO 2: Modificar rooms/urls.py*
 
@@ -42,6 +43,9 @@ urlpatterns = [
     # NUEVOS ENDPOINTS: Comparación turnos vs registros y validación de acceso anticipado
     path('reports/turn-comparison/', views_reports.get_turn_comparison, name='get_turn_comparison'),
     path('entry/validate/', views_reports.validate_entry_access, name='validate_entry_access'),
+    
+    # Endpoint para monitores: sus propias llegadas tarde
+    path('monitor/late-arrivals/', views_reports.get_monitor_late_arrivals, name='get_monitor_late_arrivals'),
     
     # Sistema de reutilización de IDs
     path('admin/id-statistics/', views_reports.get_id_statistics, name='get_id_statistics'),

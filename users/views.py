@@ -51,28 +51,44 @@ def register_view(request):
     """
     Vista para el registro de nuevos usuarios
     """
-    serializer = UserRegistrationSerializer(data=request.data)
-    if serializer.is_valid():
-        user = serializer.save()
+    try:
+        serializer = UserRegistrationSerializer(data=request.data)
+        if serializer.is_valid():
+            user = serializer.save()
+            
+            # Mensaje diferenciado según el rol
+            if user.role == 'monitor':
+                message = 'Usuario registrado exitosamente. Esperando verificación del administrador.'
+            else:
+                message = 'Administrador registrado y verificado exitosamente.'
+            
+            return Response({
+                'message': message,
+                'user': {
+                    'id': user.id,
+                    'username': user.username,
+                    'email': user.email,
+                    'role': user.role,
+                    'is_verified': user.is_verified
+                }
+            }, status=status.HTTP_201_CREATED)
         
-        # Mensaje diferenciado según el rol
-        if user.role == 'monitor':
-            message = 'Usuario registrado exitosamente. Esperando verificación del administrador.'
-        else:
-            message = 'Administrador registrado y verificado exitosamente.'
-        
-        return Response({
-            'message': message,
-            'user': {
-                'id': user.id,
-                'username': user.username,
-                'email': user.email,
-                'role': user.role,
-                'is_verified': user.is_verified
-            }
-        }, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
-    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    except Exception as e:
+        # Manejar IntegrityError específicamente
+        if 'IntegrityError' in str(type(e)):
+            return Response({
+                'error': 'Error de integridad de datos',
+                'details': 'Ya existe un usuario con estos datos. Verifica que el username, email e identificación sean únicos.',
+                'field': 'identification'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Otros errores
+        return Response({
+            'error': 'Error interno del servidor',
+            'details': str(e)
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @csrf_exempt

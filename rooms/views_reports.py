@@ -10,6 +10,7 @@ from django.utils import timezone
 from datetime import datetime, timedelta
 import logging
 from .serializers import RoomEntrySerializer, TurnComparisonSerializer, EntryValidationSerializer
+from .timezone_utils import parse_date_to_bogota, create_date_range_bogota, convert_to_bogota
 from .utils import generar_comparacion_turnos_registros, validar_acceso_anticipado
 from users.permissions import IsMonitorUser
 
@@ -145,8 +146,12 @@ def calculate_worked_hours(request):
         overlaps_found = []
         
         for entry in entries:
+            # Solo procesar entradas completas (con salida registrada)
+            if entry.exit_time is None:
+                continue  # Saltar entradas sin salida
+                
             entry_start = entry.entry_time
-            entry_end = entry.exit_time if entry.exit_time else timezone.now()
+            entry_end = entry.exit_time
             entry_user = entry.user
             
             # Buscar turnos del mismo usuario
@@ -332,23 +337,42 @@ def calculate_late_arrivals(request):
         processed_entries = set()
         late_details = []
         
+        # Zona horaria de Bogotá
+        import pytz
+        bogota_tz = pytz.timezone('America/Bogota')
+        
         for schedule in schedules:
+            # Convertir turno a zona horaria de Bogotá
             schedule_start = schedule.start_datetime
+            if schedule_start.tzinfo is None:
+                schedule_start = bogota_tz.localize(schedule_start)
+            else:
+                schedule_start = schedule_start.astimezone(bogota_tz)
             
-            # Buscar primera entrada después del inicio del turno
+            # Buscar entradas desde 10 minutos antes del turno hasta final del día
+            turno_end = schedule_start.replace(hour=23, minute=59, second=59, microsecond=999999)
+            rango_inicio = schedule_start - timedelta(minutes=10)
+            
             schedule_entries = RoomEntry.objects.filter(
                 user=schedule.user,
-                entry_time__gte=schedule_start
+                entry_time__gte=rango_inicio,
+                entry_time__lte=turno_end
             ).order_by('entry_time')
             
             if schedule_entries.exists():
                 first_entry = schedule_entries.first()
                 entry_time = first_entry.entry_time
                 
+                # Convertir entrada a zona horaria de Bogotá
+                if entry_time.tzinfo is None:
+                    entry_time = bogota_tz.localize(entry_time)
+                else:
+                    entry_time = entry_time.astimezone(bogota_tz)
+                
                 if first_entry.id not in processed_entries:
-                    # Verificar si es llegada tarde (más de 20 minutos)
+                    # Verificar si es llegada tarde (más de 5 minutos)
                     time_diff = (entry_time - schedule_start).total_seconds() / 60
-                    is_late = time_diff > 20
+                    is_late = time_diff > 5
                     
                     if is_late:
                         late_count += 1
@@ -585,8 +609,12 @@ def calculate_report_stats(request):
         # Calcular horas trabajadas con superposición
         total_worked_hours = 0.0
         for entry in entries:
+            # Solo procesar entradas completas (con salida registrada)
+            if entry.exit_time is None:
+                continue  # Saltar entradas sin salida
+                
             entry_start = entry.entry_time
-            entry_end = entry.exit_time if entry.exit_time else timezone.now()
+            entry_end = entry.exit_time
             entry_user = entry.user
             
             user_schedules = [s for s in schedules if s.user == entry_user]
@@ -601,20 +629,41 @@ def calculate_report_stats(request):
         
         # Calcular llegadas tarde
         late_count = 0
+        
+        # Zona horaria de Bogotá
+        import pytz
+        bogota_tz = pytz.timezone('America/Bogota')
+        
         for schedule in schedules:
+            # Convertir turno a zona horaria de Bogotá
             schedule_start = schedule.start_datetime
+            if schedule_start.tzinfo is None:
+                schedule_start = bogota_tz.localize(schedule_start)
+            else:
+                schedule_start = schedule_start.astimezone(bogota_tz)
+            
+            # Buscar entradas desde 10 minutos antes del turno hasta final del día
+            turno_end = schedule_start.replace(hour=23, minute=59, second=59, microsecond=999999)
+            rango_inicio = schedule_start - timedelta(minutes=10)
             
             schedule_entries = RoomEntry.objects.filter(
                 user=schedule.user,
-                entry_time__gte=schedule_start
+                entry_time__gte=rango_inicio,
+                entry_time__lte=turno_end
             ).order_by('entry_time')
             
             if schedule_entries.exists():
                 first_entry = schedule_entries.first()
                 entry_time = first_entry.entry_time
                 
+                # Convertir entrada a zona horaria de Bogotá
+                if entry_time.tzinfo is None:
+                    entry_time = bogota_tz.localize(entry_time)
+                else:
+                    entry_time = entry_time.astimezone(bogota_tz)
+                
                 time_diff = (entry_time - schedule_start).total_seconds() / 60
-                if time_diff > 20:
+                if time_diff > 5:
                     late_count += 1
         
         # Calcular horas asignadas
@@ -827,5 +876,138 @@ def get_id_statistics(request):
         logger.error(f"Error al obtener estadísticas de ID: {e}")
         return Response({
             'error': 'Error al obtener estadísticas',
+            'details': str(e)
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['GET'])
+@authentication_classes([TokenAuthentication])
+@permission_classes([IsMonitorUser])
+def get_monitor_late_arrivals(request):
+    """
+    Endpoint para que los monitores vean sus propias llegadas tarde
+    Solo muestra datos del monitor actualmente logueado
+    """
+    try:
+        # Obtener parámetros de filtro
+        from_date = request.GET.get('from_date', '').strip()
+        to_date = request.GET.get('to_date', '').strip()
+        
+        # El usuario actual (monitor logueado)
+        current_user = request.user
+        
+        # Obtener turnos del monitor actual
+        schedules_queryset = Schedule.objects.filter(user=current_user).select_related('room')
+        
+        # Aplicar filtros de fecha a turnos
+        if from_date and to_date:
+            try:
+                from .timezone_utils import create_date_range_bogota
+                start_datetime, end_datetime = create_date_range_bogota(from_date, to_date)
+                schedules_queryset = schedules_queryset.filter(
+                    start_datetime__gte=start_datetime,
+                    start_datetime__lte=end_datetime
+                )
+            except ValueError as e:
+                logger.warning(f"Error parsing date range: {e}")
+                return Response({
+                    'error': 'Formato de fecha inválido. Use YYYY-MM-DD'
+                }, status=status.HTTP_400_BAD_REQUEST)
+        elif from_date:
+            try:
+                from .timezone_utils import create_date_range_bogota
+                start_datetime, _ = create_date_range_bogota(from_date)
+                schedules_queryset = schedules_queryset.filter(start_datetime__gte=start_datetime)
+            except ValueError as e:
+                logger.warning(f"Error parsing from_date: {e}")
+                return Response({
+                    'error': 'Formato de fecha inválido. Use YYYY-MM-DD'
+                }, status=status.HTTP_400_BAD_REQUEST)
+        elif to_date:
+            try:
+                from .timezone_utils import create_date_range_bogota
+                _, end_datetime = create_date_range_bogota(to_date, to_date)
+                schedules_queryset = schedules_queryset.filter(start_datetime__lte=end_datetime)
+            except ValueError as e:
+                logger.warning(f"Error parsing to_date: {e}")
+                return Response({
+                    'error': 'Formato de fecha inválido. Use YYYY-MM-DD'
+                }, status=status.HTTP_400_BAD_REQUEST)
+        
+        schedules = list(schedules_queryset)
+        
+        # Calcular llegadas tarde del monitor
+        late_count = 0
+        late_details = []
+        
+        # Zona horaria de Bogotá
+        import pytz
+        bogota_tz = pytz.timezone('America/Bogota')
+        
+        for schedule in schedules:
+            # Convertir turno a zona horaria de Bogotá
+            schedule_start = schedule.start_datetime
+            if schedule_start.tzinfo is None:
+                schedule_start = bogota_tz.localize(schedule_start)
+            else:
+                schedule_start = schedule_start.astimezone(bogota_tz)
+            
+            # Buscar entradas desde 10 minutos antes del turno hasta final del día
+            turno_end = schedule_start.replace(hour=23, minute=59, second=59, microsecond=999999)
+            rango_inicio = schedule_start - timedelta(minutes=10)
+            
+            schedule_entries = RoomEntry.objects.filter(
+                user=current_user,
+                entry_time__gte=rango_inicio,
+                entry_time__lte=turno_end
+            ).order_by('entry_time')
+            
+            if schedule_entries.exists():
+                first_entry = schedule_entries.first()
+                entry_time = first_entry.entry_time
+                
+                # Convertir entrada a zona horaria de Bogotá
+                if entry_time.tzinfo is None:
+                    entry_time = bogota_tz.localize(entry_time)
+                else:
+                    entry_time = entry_time.astimezone(bogota_tz)
+                
+                time_diff = (entry_time - schedule_start).total_seconds() / 60
+                if time_diff > 5:  # Más de 5 minutos tarde
+                    late_count += 1
+                    late_details.append({
+                        'schedule_id': schedule.id,
+                        'room_name': schedule.room.name,
+                        'scheduled_time': schedule_start.strftime('%H:%M'),
+                        'actual_time': entry_time.strftime('%H:%M'),
+                        'delay_minutes': round(time_diff, 1),
+                        'date': schedule_start.strftime('%Y-%m-%d'),
+                        'notes': first_entry.notes or ''
+                    })
+        
+        # Calcular estadísticas adicionales
+        total_schedules = len(schedules)
+        punctuality_percentage = round(((total_schedules - late_count) / total_schedules * 100) if total_schedules > 0 else 0, 2)
+        
+        return Response({
+            'monitor_info': {
+                'username': current_user.username,
+                'full_name': current_user.get_full_name(),
+                'email': current_user.email
+            },
+            'late_arrivals_count': late_count,
+            'total_schedules': total_schedules,
+            'punctuality_percentage': punctuality_percentage,
+            'late_details': late_details,
+            'filters_applied': {
+                'from_date': from_date,
+                'to_date': to_date
+            }
+        }, status=status.HTTP_200_OK)
+        
+    except Exception as e:
+        logger.error(f"Error en get_monitor_late_arrivals: {e}")
+        return Response({
+            'error': 'Error al obtener llegadas tarde del monitor',
             'details': str(e)
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
