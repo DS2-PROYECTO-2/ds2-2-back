@@ -568,7 +568,7 @@ def dashboard_view(request):
             'message': f'Bienvenido, {user.get_full_name()}'
         })
 
-@api_view(['DELETE'])
+@api_view(['DELETE', 'POST'])
 @authentication_classes([TokenAuthentication])
 @permission_classes([IsAdminUser])  # usa tu permiso de admin
 def admin_delete_user_view(request, user_id):
