@@ -202,7 +202,17 @@ REST_FRAMEWORK = {
         'rest_framework.renderers.JSONRenderer',
     ],
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
-    'PAGE_SIZE': 20
+    'PAGE_SIZE': 20,
+    # Throttling para evitar ráfagas desde el frontend
+    'DEFAULT_THROTTLE_CLASSES': [
+        'rest_framework.throttling.AnonRateThrottle',
+        'rest_framework.throttling.UserRateThrottle',
+    ],
+    # Ajusta estos valores según tu carga real
+    'DEFAULT_THROTTLE_RATES': {
+        'anon': '60/min',
+        'user': '120/min',
+    },
 }
 
 # CORS Configuration
