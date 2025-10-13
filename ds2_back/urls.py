@@ -16,9 +16,19 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path, include
+from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
+
+@csrf_exempt
+def test_delete(request):
+    if request.method == "DELETE":
+        return JsonResponse({"ok": True, "msg": "DELETE recibido"})
+    return JsonResponse({"ok": False, "msg": "Método no permitido"}, status=405)
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+    # Endpoint de prueba para validar DELETE/CORS/proxy
+    path('api/test-delete/', test_delete),
     path('api/auth/', include('users.urls')),
     path('api/users/', include('users.urls')),
     path('api/rooms/', include('rooms.urls')),
