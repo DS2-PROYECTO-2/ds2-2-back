@@ -36,3 +36,4 @@ class IncapacityViewSet(viewsets.ModelViewSet):
         return [permissions.IsAuthenticated()]
     
     # Agregar métodos para aprobar incapacidades, asignar usuario, etc.
+

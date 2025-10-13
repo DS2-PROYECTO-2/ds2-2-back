@@ -24,3 +24,4 @@ class IncapacitySerializer(serializers.ModelSerializer):
                   'approved', 'approved_by', 'created_at', 'updated_at']
         read_only_fields = ['id', 'approved', 'approved_by', 'created_at', 'updated_at']
         # Agregar lógica para validar fechas, calcular duración, etc.
+

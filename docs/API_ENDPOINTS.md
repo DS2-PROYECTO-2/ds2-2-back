@@ -51,6 +51,7 @@ GET  /api/rooms/{id}/occupants/    # Ocupantes actuales de una sala
 POST /api/rooms/entry/             # Crear nueva entrada
 PATCH /api/rooms/entry/{id}/exit/  # Salir de una entrada específica
 PATCH /api/rooms/my-active-entry/exit/  # Salir de entrada activa (sin ID)
+POST /api/rooms/entry/validate/    # Validar acceso anticipado a una sala
 ```
 
 ### **Historial del Usuario**
@@ -58,6 +59,14 @@ PATCH /api/rooms/my-active-entry/exit/  # Salir de entrada activa (sin ID)
 GET  /api/rooms/my-entries/        # Historial de entradas del usuario
 GET  /api/rooms/my-active-entry/   # Entrada activa del usuario
 GET  /api/rooms/my-daily-summary/ # Resumen diario del usuario
+```
+
+### **Reportes de Salas (Analítica)**
+```
+GET  /api/rooms/reports/worked-hours/   # Horas trabajadas (superposición con turnos)
+GET  /api/rooms/reports/late-arrivals/  # Llegadas tarde (gracia 5m, permite -10m)
+GET  /api/rooms/reports/stats/          # Estadísticas combinadas
+GET  /api/rooms/reports/turn-comparison/ # Comparación turnos vs registros
 ```
 
 ---
@@ -113,6 +122,34 @@ python manage.py check_excessive_hours --dry-run
 
 # Modo verbose (información detallada)
 python manage.py check_excessive_hours --verbose
+```
+
+---
+
+## 🧮 **Detalles de Cálculo: Llegadas Tarde**
+
+- Periodo de gracia: 5 minutos después del inicio del turno.
+- Entradas hasta 10 minutos antes del inicio del turno no cuentan como tarde.
+- La primera entrada del día para el turno y sala correspondientes se toma desde 10 min antes del `start_datetime` del turno, misma fecha y misma sala.
+
+Formato de respuesta `GET /api/rooms/reports/late-arrivals/`:
+```
+{
+  "late_arrivals_count": number,
+  "total_schedules": number,
+  "late_details": [
+    {
+      "schedule_id": number,
+      "entry_id": number,
+      "user": string,
+      "room": string,
+      "schedule_start": ISODateTime,
+      "entry_time": ISODateTime,
+      "delay_minutes": number  // minutos efectivos de tardanza (>5)
+    }
+  ],
+  "filters_applied": { ... }
+}
 ```
 
 ---

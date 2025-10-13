@@ -43,8 +43,8 @@ def calculate_worked_hours(request):
         user_id = request.GET.get('user_id', '').strip()
         room_id = request.GET.get('room_id', '').strip()
         
-        # Obtener todas las entradas
-        entries_queryset = RoomEntry.objects.select_related('user', 'room').all()
+        # Obtener todas las entradas (excluir sin salida para evitar inconsistencias)
+        entries_queryset = RoomEntry.objects.select_related('user', 'room').filter(exit_time__isnull=False)
         
         # Aplicar filtros de fecha
         if from_date and to_date:
@@ -327,33 +327,45 @@ def calculate_late_arrivals(request):
         
         schedules = list(schedules_queryset)
         
-        # Calcular llegadas tarde
+        # Calcular llegadas tarde (ajuste: se permite entrar hasta 10 minutos antes y gracia de 5 minutos)
         late_count = 0
         processed_entries = set()
         late_details = []
-        
+
+        EARLY_ALLOW_MINUTES = 10
+        GRACE_MINUTES = 5
+
         for schedule in schedules:
             schedule_start = schedule.start_datetime
-            
-            # Buscar primera entrada después del inicio del turno
+
+            # Considerar entradas desde 10 minutos antes del inicio del turno, mismo día y sala
+            window_start = schedule_start - timedelta(minutes=EARLY_ALLOW_MINUTES)
+
             schedule_entries = RoomEntry.objects.filter(
                 user=schedule.user,
-                entry_time__gte=schedule_start
+                room=schedule.room,
+                entry_time__date=schedule_start.date(),
+                entry_time__gte=window_start
             ).order_by('entry_time')
-            
+
             if schedule_entries.exists():
                 first_entry = schedule_entries.first()
                 entry_time = first_entry.entry_time
-                
+
                 if first_entry.id not in processed_entries:
-                    # Verificar si es llegada tarde (más de 20 minutos)
+                    # Diferencia en minutos respecto al inicio del turno (puede ser negativa si entró antes)
                     time_diff = (entry_time - schedule_start).total_seconds() / 60
-                    is_late = time_diff > 20
-                    
+
+                    # Entradas hasta 10 min antes no cuentan como tarde (se normaliza a 0)
+                    effective_delay = 0 if -EARLY_ALLOW_MINUTES <= time_diff <= 0 else time_diff
+
+                    # Llegada tarde si supera los 5 minutos de gracia
+                    is_late = effective_delay > GRACE_MINUTES
+
                     if is_late:
                         late_count += 1
                         processed_entries.add(first_entry.id)
-                        
+
                         late_details.append({
                             'schedule_id': schedule.id,
                             'entry_id': first_entry.id,
@@ -361,10 +373,10 @@ def calculate_late_arrivals(request):
                             'room': schedule.room.name,
                             'schedule_start': schedule_start.isoformat(),
                             'entry_time': entry_time.isoformat(),
-                            'delay_minutes': round(time_diff, 2)
+                            'delay_minutes': round(effective_delay, 2)
                         })
                     else:
-                        # También registrar entradas a tiempo para debug
+                        # Registrar como procesada aunque no sea tarde
                         processed_entries.add(first_entry.id)
         
         return Response({
@@ -386,6 +398,117 @@ def calculate_late_arrivals(request):
             'details': str(e)
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+
+@api_view(['GET'])
+@authentication_classes([TokenAuthentication])
+@permission_classes([IsMonitorUser])
+def monitor_late_arrivals(request):
+    """
+    Llegadas tarde para el monitor autenticado en un rango.
+    Reglas:
+    - Se permite ingresar hasta 10 minutos antes del turno (no cuenta como tarde)
+    - Período de gracia: 5 minutos
+    - Se toma el PRIMER registro del día/turno en esa sala
+    """
+    try:
+        from_date = request.GET.get('from_date', '').strip()
+        to_date = request.GET.get('to_date', '').strip()
+
+        schedules_queryset = Schedule.objects.select_related('user', 'room').filter(user=request.user)
+
+        # Filtro por fechas
+        if from_date and to_date:
+            try:
+                from datetime import datetime, timezone
+                from_date_obj = datetime.fromisoformat(from_date.replace('Z', '+00:00')) if 'T' in from_date else datetime.fromisoformat(from_date)
+                to_date_obj = datetime.fromisoformat(to_date.replace('Z', '+00:00')) if 'T' in to_date else datetime.fromisoformat(to_date)
+                if from_date_obj.tzinfo is None:
+                    from_date_obj = from_date_obj.replace(tzinfo=timezone.utc)
+                if to_date_obj.tzinfo is None:
+                    to_date_obj = to_date_obj.replace(tzinfo=timezone.utc)
+                start_datetime = from_date_obj.replace(hour=0, minute=0, second=0, microsecond=0)
+                end_datetime = to_date_obj.replace(hour=23, minute=59, second=59, microsecond=999999)
+                if start_datetime.tzinfo is not None:
+                    start_datetime = start_datetime.replace(tzinfo=None)
+                if end_datetime.tzinfo is not None:
+                    end_datetime = end_datetime.replace(tzinfo=None)
+                schedules_queryset = schedules_queryset.filter(start_datetime__gte=start_datetime, start_datetime__lte=end_datetime)
+            except ValueError:
+                pass
+        elif from_date:
+            try:
+                from datetime import datetime, timezone
+                from_date_obj = datetime.fromisoformat(from_date.replace('Z', '+00:00')) if 'T' in from_date else datetime.fromisoformat(from_date)
+                if from_date_obj.tzinfo is None:
+                    from_date_obj = from_date_obj.replace(tzinfo=timezone.utc)
+                start_datetime = from_date_obj.replace(hour=0, minute=0, second=0, microsecond=0)
+                if start_datetime.tzinfo is not None:
+                    start_datetime = start_datetime.replace(tzinfo=None)
+                schedules_queryset = schedules_queryset.filter(start_datetime__gte=start_datetime)
+            except ValueError:
+                pass
+        elif to_date:
+            try:
+                from datetime import datetime, timezone
+                to_date_obj = datetime.fromisoformat(to_date.replace('Z', '+00:00')) if 'T' in to_date else datetime.fromisoformat(to_date)
+                if to_date_obj.tzinfo is None:
+                    to_date_obj = to_date_obj.replace(tzinfo=timezone.utc)
+                end_datetime = to_date_obj.replace(hour=23, minute=59, second=59, microsecond=999999)
+                if end_datetime.tzinfo is not None:
+                    end_datetime = end_datetime.replace(tzinfo=None)
+                schedules_queryset = schedules_queryset.filter(start_datetime__lte=end_datetime)
+            except ValueError:
+                pass
+
+        schedules = list(schedules_queryset)
+
+        EARLY_ALLOW_MINUTES = 10
+        GRACE_MINUTES = 5
+
+        late_count = 0
+        late_details = []
+
+        for schedule in schedules:
+            schedule_start = schedule.start_datetime
+            window_start = schedule_start - timedelta(minutes=EARLY_ALLOW_MINUTES)
+
+            first_entry = RoomEntry.objects.filter(
+                user=request.user,
+                room=schedule.room,
+                entry_time__date=schedule_start.date(),
+                entry_time__gte=window_start
+            ).order_by('entry_time').first()
+
+            if first_entry:
+                time_diff = (first_entry.entry_time - schedule_start).total_seconds() / 60
+                effective_delay = 0 if -EARLY_ALLOW_MINUTES <= time_diff <= 0 else time_diff
+                if effective_delay > GRACE_MINUTES:
+                    late_count += 1
+                    late_details.append({
+                        'schedule_id': schedule.id,
+                        'entry_id': first_entry.id,
+                        'room': schedule.room.name,
+                        'schedule_start': schedule_start.isoformat(),
+                        'entry_time': first_entry.entry_time.isoformat(),
+                        'delay_minutes': round(effective_delay, 2)
+                    })
+
+        return Response({
+            'late_arrivals_count': late_count,
+            'late_details': late_details,
+            'filters_applied': {
+                'from_date': from_date,
+                'to_date': to_date
+            }
+        }, status=status.HTTP_200_OK)
+
+    except Exception as e:
+        logger.error(f"Error en monitor_late_arrivals: {e}")
+        return Response({
+            'error': 'Error al calcular llegadas tarde del monitor',
+            'details': str(e)
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 @api_view(['GET'])
 @authentication_classes([TokenAuthentication])
 @permission_classes([IsAdminUser])
@@ -400,8 +523,8 @@ def calculate_report_stats(request):
         user_id = request.GET.get('user_id', '').strip()
         room_id = request.GET.get('room_id', '').strip()
         
-        # Calcular horas trabajadas directamente
-        entries_queryset = RoomEntry.objects.select_related('user', 'room').all()
+        # Calcular horas trabajadas directamente (excluir sin salida para evitar errores)
+        entries_queryset = RoomEntry.objects.select_related('user', 'room').filter(exit_time__isnull=False)
         
         # Aplicar filtros de fecha a entradas
         if from_date and to_date:

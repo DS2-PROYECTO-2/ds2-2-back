@@ -257,6 +257,18 @@ Response: {
 }
 ```
 
+### **✅ Reportes de Salas**
+```
+GET /api/rooms/reports/worked-hours/
+GET /api/rooms/reports/late-arrivals/
+GET /api/rooms/reports/stats/
+GET /api/rooms/reports/turn-comparison/
+POST /api/rooms/entry/validate/
+```
+
+**Notas recientes:**
+- Llegadas tarde: periodo de gracia ajustado a 5 minutos y se permiten entradas hasta 10 minutos antes del turno sin marcar como tarde.
+
 ---
 
 ## 🎯 **6. FUNCIONALIDADES IMPLEMENTADAS**

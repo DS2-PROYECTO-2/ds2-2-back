@@ -69,6 +69,7 @@ class RoomEntrySerializer(serializers.ModelSerializer):
     user_username = serializers.CharField(source='user.username', read_only=True)
     room_name = serializers.CharField(source='room.name', read_only=True)
     room_code = serializers.CharField(source='room.code', read_only=True)
+    user_identification = serializers.CharField(source='user.identification', read_only=True)
     duration_hours = serializers.ReadOnlyField()
     duration_minutes = serializers.ReadOnlyField()
     duration_formatted = serializers.CharField(source='get_duration_formatted', read_only=True)
@@ -78,7 +79,7 @@ class RoomEntrySerializer(serializers.ModelSerializer):
         model = RoomEntry
         fields = [
             'id', 'user', 'room', 'user_name', 'user_username',
-            'room_name', 'room_code', 'entry_time', 'exit_time',
+            'room_name', 'room_code', 'user_identification', 'entry_time', 'exit_time',
             'duration_hours', 'duration_minutes', 'duration_formatted',
             'is_active', 'notes', 'created_at', 'updated_at'
         ]

@@ -39,16 +39,16 @@ def clasificar_estado(diferencia_minutos):
     Período de gracia: 5 minutos
     
     Lógica corregida:
-    - A_TIEMPO: Llegó antes del turno o exactamente a tiempo (diferencia <= 0)
-    - SOBRE_LA_HORA: Llegó tarde pero dentro del período de gracia (0 < diferencia <= 5)
+    - A_TIEMPO: Llegó antes del turno (diferencia < 0)
+    - SOBRE_LA_HORA: Llegó tarde pero dentro del período de gracia (0 <= diferencia <= 5)
     - TARDE: Llegó muy tarde, fuera del período de gracia (diferencia > 5)
     """
     if diferencia_minutos > 5:
         return 'TARDE'  # Llegó más de 5 minutos tarde
-    elif diferencia_minutos > 0:
+    elif diferencia_minutos >= 0:
         return 'SOBRE_LA_HORA'  # Llegó tarde pero dentro del período de gracia
     else:
-        return 'A_TIEMPO'  # Llegó antes del turno o exactamente a tiempo (diferencia <= 0)
+        return 'A_TIEMPO'  # Llegó antes del turno
 
 def formatear_diferencia(diferencia_minutos):
     """
@@ -136,34 +136,38 @@ def generar_comparacion_turnos_registros(date_from, date_to, user_id=None, room_
         else:
             registro = None
         
-        # Calcular diferencia y estado
+        # Calcular diferencia y estado (mostrando horas en zona Bogotá)
         if registro:
             diferencia = calcular_diferencia(turno.start_datetime, registro.entry_time)
             estado = clasificar_estado(diferencia)
             diferencia_formateada = formatear_diferencia(diferencia)
-            
+
+            turno_bogota = turno.start_datetime.astimezone(BOGOTA_TZ) if turno.start_datetime.tzinfo else BOGOTA_TZ.localize(turno.start_datetime)
+            registro_bogota = registro.entry_time.astimezone(BOGOTA_TZ) if registro.entry_time.tzinfo else BOGOTA_TZ.localize(registro.entry_time)
+
             comparaciones.append({
-                'usuario': turno.user.username,
-                'turno': turno.start_datetime.strftime('%H:%M'),
-                'registro': registro.entry_time.strftime('%H:%M'),
+                'usuario': turno.user.get_full_name() or turno.user.username,
+                'turno': turno_bogota.strftime('%H:%M'),
+                'registro': registro_bogota.strftime('%H:%M'),
                 'diferencia': int(diferencia),
                 'diferencia_formateada': diferencia_formateada,
                 'estado': estado,
                 'notas': registro.notes or '',
                 'sala': turno.room.name,
-                'fecha': turno.start_datetime.strftime('%Y-%m-%d')
+                'fecha': turno_bogota.strftime('%Y-%m-%d')
             })
         else:
+            turno_bogota = turno.start_datetime.astimezone(BOGOTA_TZ) if turno.start_datetime.tzinfo else BOGOTA_TZ.localize(turno.start_datetime)
             comparaciones.append({
-                'usuario': turno.user.username,
-                'turno': turno.start_datetime.strftime('%H:%M'),
-                'registro': 'Sin registro',
+                'usuario': turno.user.get_full_name() or turno.user.username,
+                'turno': turno_bogota.strftime('%H:%M'),
+                'registro': '-',
                 'diferencia': 0,
                 'diferencia_formateada': '0',
                 'estado': 'SIN_REGISTRO',
                 'notas': '',
                 'sala': turno.room.name,
-                'fecha': turno.start_datetime.strftime('%Y-%m-%d')
+                'fecha': turno_bogota.strftime('%Y-%m-%d')
             })
     
     return comparaciones
