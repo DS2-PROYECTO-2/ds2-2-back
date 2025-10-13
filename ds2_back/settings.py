@@ -216,7 +216,7 @@ CORS_ALLOWED_ORIGINS = [
     "https://ds2-2-front.vercel.app",  # Frontend en Vercel
 ]
 
-CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOW_CREDENTIALS = False
 
 # Permitir también subdominios de Vercel (previews):
 CORS_ALLOWED_ORIGIN_REGEXES = [r"^https:\/\/.*\.vercel\.app$"]
@@ -235,6 +235,9 @@ CORS_ALLOW_HEADERS = list(default_headers) + [
 CSRF_TRUSTED_ORIGINS = [
     'https://ds2-2-front.vercel.app',
 ]
+
+# Limitar CORS a rutas de API
+CORS_URLS_REGEX = r'^/api/.*$'
 
 # Media files configuration
 MEDIA_URL = '/media/'
