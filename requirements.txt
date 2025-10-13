@@ -28,6 +28,7 @@ django-extensions==3.2.3  # Extended management commands
 
 # Utilities
 python-decouple==3.8  # Environment variables
+django-environ==0.11.2  # Environment variables (django-specific)
 pytz==2023.3  # Timezone handling
 Pillow==10.1.0  # Image processing
 
