@@ -100,37 +100,13 @@ WSGI_APPLICATION = 'ds2_back.wsgi.application'
 
 import sys
 
-# Configuración condicional de base de datos
-if 'test' in sys.argv or 'pytest' in sys.modules:
-    # SQLite para tests (más rápido y no requiere servidor PostgreSQL)
-    DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.sqlite3',
-            'NAME': ':memory:',  # Base de datos en memoria para tests más rápidos
-            'OPTIONS': {
-                'timeout': 20,
-            },
-        }
-    }
-else:
-    # PostgreSQL para desarrollo y producción
-    DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.postgresql',
-            'NAME': env('DB_NAME'),
-            'USER': env('DB_USER'),
-            'PASSWORD': env('DB_PASSWORD'),
-            'HOST': env('DB_HOST'),
-            'PORT': env('DB_PORT'),
-        }
-    }
-"""
 # Estrategia de selección de base de datos:
 # 1) Tests: SQLite en memoria
-# 2) Si existe DATABASE_URL en .env -> usarla (soporta sqlite/postgres)
-# 3) Si hay variables DB_* -> usar PostgreSQL
-# 4) Fallback: SQLite en archivo
+# 2) Si existe DATABASE_URL -> usarla (Render, Heroku, etc.)
+# 3) Si hay variables DB_* -> usar PostgreSQL local
+# 4) Fallback: SQLite en memoria (CI sin configuración)
 if 'test' in sys.argv or 'pytest' in sys.modules:
+    # SQLite para tests (más rápido y no requiere servidor PostgreSQL)
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.sqlite3',
@@ -138,14 +114,16 @@ if 'test' in sys.argv or 'pytest' in sys.modules:
             'OPTIONS': {'timeout': 20},
         }
     }
-    
 else:
+    # Verificar si existe DATABASE_URL (producción en Render)
     database_url = env.str('DATABASE_URL', default='')
     if database_url:
+        # Usar DATABASE_URL de Render/Heroku
         DATABASES = {
             'default': env.db(),
         }
     elif env.str('DB_NAME', default=''):
+        # Usar configuración PostgreSQL local con variables DB_*
         DATABASES = {
             'default': {
                 'ENGINE': 'django.db.backends.postgresql',
@@ -157,29 +135,14 @@ else:
             }
         }
     else:
+        # Fallback para CI/CD sin variables de entorno: usar SQLite
         DATABASES = {
             'default': {
-                'ENGINE': 'django.db.backends.postgresql',
-                'NAME': env('DB_NAME'),
-                'USER': env('DB_USER', default='postgres'),
-                'PASSWORD': env('DB_PASSWORD', default=''),
-                'HOST': env('DB_HOST', default='127.0.0.1'),
-                'PORT': env('DB_PORT', default='5432'),
+                'ENGINE': 'django.db.backends.sqlite3',
+                'NAME': ':memory:',
+                'OPTIONS': {'timeout': 20},
             }
         }
-
-# SQLite Configuration (backup para desarrollo local si es necesario)
-# DATABASES = {
-#     'default': {
-#         'ENGINE': 'django.db.backends.sqlite3',
-#         'NAME': BASE_DIR / 'db.sqlite3',
-#         'OPTIONS': {
-#             # Aumenta el tiempo de espera cuando hay locks (segundos)
-#             'timeout': 20,
-#         },
-#     }
-# }
-"""
 
 # Password validation
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
