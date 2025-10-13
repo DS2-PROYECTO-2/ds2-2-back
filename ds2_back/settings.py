@@ -142,29 +142,16 @@ if 'test' in sys.argv or 'pytest' in sys.modules:
 else:
     database_url = env.str('DATABASE_URL', default='')
     if database_url:
+        # Usar DATABASE_URL si está disponible (para Render, Heroku, etc.)
         DATABASES = {
             'default': env.db(),
         }
-    elif env.str('DB_NAME', default=''):
-        DATABASES = {
-            'default': {
-                'ENGINE': 'django.db.backends.postgresql',
-                'NAME': env('DB_NAME'),
-                'USER': env('DB_USER', default='postgres'),
-                'PASSWORD': env('DB_PASSWORD', default=''),
-                'HOST': env('DB_HOST', default='127.0.0.1'),
-                'PORT': env('DB_PORT', default='5432'),
-            }
-        }
     else:
+        # Fallback para desarrollo local con SQLite
         DATABASES = {
             'default': {
-                'ENGINE': 'django.db.backends.postgresql',
-                'NAME': env('DB_NAME'),
-                'USER': env('DB_USER', default='postgres'),
-                'PASSWORD': env('DB_PASSWORD', default=''),
-                'HOST': env('DB_HOST', default='127.0.0.1'),
-                'PORT': env('DB_PORT', default='5432'),
+                'ENGINE': 'django.db.backends.sqlite3',
+                'NAME': BASE_DIR / 'db.sqlite3',
             }
         }
 
