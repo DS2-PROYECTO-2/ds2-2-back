@@ -113,38 +113,24 @@ if 'test' in sys.argv or 'pytest' in sys.modules:
         }
     }
 else:
-    # PostgreSQL para desarrollo y producción
-    DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.postgresql',
-            'NAME': env('DB_NAME'),
-            'USER': env('DB_USER'),
-            'PASSWORD': env('DB_PASSWORD'),
-            'HOST': env('DB_HOST'),
-            'PORT': env('DB_PORT'),
-        }
-    }
-"""
-# Estrategia de selección de base de datos:
-# 1) Tests: SQLite en memoria
-# 2) Si existe DATABASE_URL en .env -> usarla (soporta sqlite/postgres)
-# 3) Si hay variables DB_* -> usar PostgreSQL
-# 4) Fallback: SQLite en archivo
-if 'test' in sys.argv or 'pytest' in sys.modules:
-    DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.sqlite3',
-            'NAME': ':memory:',
-            'OPTIONS': {'timeout': 20},
-        }
-    }
-    
-else:
+    # Configuración para desarrollo y producción
     database_url = env.str('DATABASE_URL', default='')
     if database_url:
         # Usar DATABASE_URL si está disponible (para Render, Heroku, etc.)
         DATABASES = {
             'default': env.db(),
+        }
+    elif env.str('DB_NAME', default=''):
+        # Usar PostgreSQL local si está configurado (para desarrollo con pgAdmin)
+        DATABASES = {
+            'default': {
+                'ENGINE': 'django.db.backends.postgresql',
+                'NAME': env('DB_NAME'),
+                'USER': env('DB_USER', default='postgres'),
+                'PASSWORD': env('DB_PASSWORD', default=''),
+                'HOST': env('DB_HOST', default='localhost'),
+                'PORT': env('DB_PORT', default='5432'),
+            }
         }
     else:
         # Fallback para desarrollo local con SQLite
@@ -154,19 +140,6 @@ else:
                 'NAME': BASE_DIR / 'db.sqlite3',
             }
         }
-
-# SQLite Configuration (backup para desarrollo local si es necesario)
-# DATABASES = {
-#     'default': {
-#         'ENGINE': 'django.db.backends.sqlite3',
-#         'NAME': BASE_DIR / 'db.sqlite3',
-#         'OPTIONS': {
-#             # Aumenta el tiempo de espera cuando hay locks (segundos)
-#             'timeout': 20,
-#         },
-#     }
-# }
-"""
 
 # Password validation
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
@@ -262,8 +235,8 @@ EMAIL_HOST_USER = env('EMAIL_HOST_USER', default='sado56hdgm@gmail.com')
 EMAIL_HOST_PASSWORD = env('EMAIL_HOST_PASSWORD', default='orfl vkzn dern pbos')
 DEFAULT_FROM_EMAIL = env('DEFAULT_FROM_EMAIL', default='Soporte DS2 <sado56hdgm@gmail.com>')
 # URL pública base para construir enlaces en correos
-PUBLIC_BASE_URL = "http://localhost:8000"
+PUBLIC_BASE_URL = env('PUBLIC_BASE_URL', default='http://localhost:8000')
 # URL del frontend para enlaces de reset de contraseña
-FRONTEND_BASE_URL = "http://localhost:5173"
+FRONTEND_BASE_URL = env('FRONTEND_BASE_URL', default='http://localhost:5173')
 # Static files configuration for production
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
