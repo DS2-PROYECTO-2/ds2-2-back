@@ -1,6 +1,7 @@
 from pathlib import Path
 import environ
 import sys
+import os
 
 """
 Django settings for ds2_back project.
