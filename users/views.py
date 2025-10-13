@@ -572,40 +572,12 @@ def dashboard_view(request):
 @authentication_classes([TokenAuthentication])
 @permission_classes([IsAdminUser])  # usa tu permiso de admin
 def admin_delete_user_view(request, user_id):
-    from django.db import transaction
-    from django.db.models import Q
-    from rest_framework.authtoken.models import Token as DRFToken
     try:
         user = User.objects.get(id=user_id)
     except User.DoesNotExist:
         return Response({'error': f'Usuario con ID {user_id} no encontrado'}, status=status.HTTP_404_NOT_FOUND)
 
-    # Borrado en cascada a nivel aplicación para asegurar limpieza completa
-    try:
-        with transaction.atomic():
-            # Importaciones locales para evitar dependencias circulares
-            from rooms.models import RoomEntry
-            from schedule.models import Schedule
-            from notifications.models import Notification
-            from attendance.models import Attendance, Incapacity
-            from equipment.models import EquipmentReport
-
-            # Eliminar objetos relacionados al usuario
-            RoomEntry.objects.filter(user=user).delete()
-            Schedule.objects.filter(Q(user=user) | Q(created_by=user)).delete()
-            Notification.objects.filter(Q(user=user)).delete()
-            Attendance.objects.filter(Q(uploaded_by=user) | Q(reviewed_by=user)).delete()
-            Incapacity.objects.filter(user=user).delete()
-            EquipmentReport.objects.filter(reported_by=user).delete()
-
-            # Revocar tokens de autenticación
-            DRFToken.objects.filter(user=user).delete()
-
-            # Finalmente, eliminar usuario
-            user.delete()
-    except Exception as e:
-        return Response({'error': 'No se pudo eliminar el usuario', 'details': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
+    user.delete()  # esto dispara post_delete y enviará el correo
     return Response(status=status.HTTP_204_NO_CONTENT)
 
 

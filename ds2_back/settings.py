@@ -27,17 +27,12 @@ environ.Env.read_env(BASE_DIR / '.env')  # Carga el .env de la raíz del proyect
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = env('SECRET_KEY', default='django-insecure-oqquaff+@v#nz5%0ujbfzn0k7z=&%^&&zgnz#x9^203qc-ej_!')
+SECRET_KEY = 'django-insecure-oqquaff+@v#nz5%0ujbfzn0k7z=&%^&&zgnz#x9^203qc-ej_!'
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = [
-    '127.0.0.1',
-    'localhost',
-    'testserver',
-    'ds2-backend.onrender.com',
-]
+ALLOWED_HOSTS = ['127.0.0.1', 'localhost', 'testserver']
 
 
 # Application definition
@@ -118,33 +113,73 @@ if 'test' in sys.argv or 'pytest' in sys.modules:
         }
     }
 else:
-    # Configuración para desarrollo y producción
+    # PostgreSQL para desarrollo y producción
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': env('DB_NAME'),
+            'USER': env('DB_USER'),
+            'PASSWORD': env('DB_PASSWORD'),
+            'HOST': env('DB_HOST'),
+            'PORT': env('DB_PORT'),
+        }
+    }
+"""
+# Estrategia de selección de base de datos:
+# 1) Tests: SQLite en memoria
+# 2) Si existe DATABASE_URL en .env -> usarla (soporta sqlite/postgres)
+# 3) Si hay variables DB_* -> usar PostgreSQL
+# 4) Fallback: SQLite en archivo
+if 'test' in sys.argv or 'pytest' in sys.modules:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': ':memory:',
+            'OPTIONS': {'timeout': 20},
+        }
+    }
+    
+else:
     database_url = env.str('DATABASE_URL', default='')
     if database_url:
-        # Usar DATABASE_URL si está disponible (para Render, Heroku, etc.)
         DATABASES = {
             'default': env.db(),
         }
     elif env.str('DB_NAME', default=''):
-        # Usar PostgreSQL local si está configurado (para desarrollo con pgAdmin)
         DATABASES = {
             'default': {
                 'ENGINE': 'django.db.backends.postgresql',
                 'NAME': env('DB_NAME'),
                 'USER': env('DB_USER', default='postgres'),
                 'PASSWORD': env('DB_PASSWORD', default=''),
-                'HOST': env('DB_HOST', default='localhost'),
+                'HOST': env('DB_HOST', default='127.0.0.1'),
                 'PORT': env('DB_PORT', default='5432'),
             }
         }
     else:
-        # Fallback para desarrollo local con SQLite
         DATABASES = {
             'default': {
-                'ENGINE': 'django.db.backends.sqlite3',
-                'NAME': BASE_DIR / 'db.sqlite3',
+                'ENGINE': 'django.db.backends.postgresql',
+                'NAME': env('DB_NAME'),
+                'USER': env('DB_USER', default='postgres'),
+                'PASSWORD': env('DB_PASSWORD', default=''),
+                'HOST': env('DB_HOST', default='127.0.0.1'),
+                'PORT': env('DB_PORT', default='5432'),
             }
         }
+
+# SQLite Configuration (backup para desarrollo local si es necesario)
+# DATABASES = {
+#     'default': {
+#         'ENGINE': 'django.db.backends.sqlite3',
+#         'NAME': BASE_DIR / 'db.sqlite3',
+#         'OPTIONS': {
+#             # Aumenta el tiempo de espera cuando hay locks (segundos)
+#             'timeout': 20,
+#         },
+#     }
+# }
+"""
 
 # Password validation
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
@@ -194,6 +229,7 @@ AUTH_USER_MODEL = 'users.User'
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
         'rest_framework.authentication.TokenAuthentication',
+        'rest_framework.authentication.SessionAuthentication',
     ],
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticated',
@@ -202,18 +238,14 @@ REST_FRAMEWORK = {
         'rest_framework.renderers.JSONRenderer',
     ],
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
-    'PAGE_SIZE': 20,
-    # Throttling para evitar ráfagas desde el frontend
-    'DEFAULT_THROTTLE_CLASSES': [
-        'rest_framework.throttling.AnonRateThrottle',
-        'rest_framework.throttling.UserRateThrottle',
-    ],
-    # Ajusta estos valores según tu carga real
-    'DEFAULT_THROTTLE_RATES': {
-        'anon': '60/min',
-        'user': '120/min',
-    },
+    'PAGE_SIZE': 20
 }
+
+# Deshabilitar CSRF para desarrollo (solo para APIs)
+if DEBUG:
+    REST_FRAMEWORK['DEFAULT_AUTHENTICATION_CLASSES'] = [
+        'rest_framework.authentication.TokenAuthentication',
+    ]
 
 # CORS Configuration
 CORS_ALLOWED_ORIGINS = [
@@ -223,31 +255,9 @@ CORS_ALLOWED_ORIGINS = [
     "http://127.0.0.1:4200",
     "http://localhost:5173",  # Vite/React
     "http://127.0.0.1:5173",
-    "https://ds2-2-front.vercel.app",  # Frontend en Vercel
 ]
 
-CORS_ALLOW_CREDENTIALS = False
-
-# Permitir también subdominios de Vercel (previews):
-CORS_ALLOWED_ORIGIN_REGEXES = [r"^https:\/\/.*\.vercel\.app$"]
-
-# Asegurar preflights con métodos y headers típicos
-from corsheaders.defaults import default_headers, default_methods
-CORS_ALLOW_METHODS = list(default_methods) + [
-    "OPTIONS",
-]
-CORS_ALLOW_HEADERS = list(default_headers) + [
-    "authorization",
-    "content-type",
-]
-
-# Frontend de confianza para CSRF (si en el futuro se usan formularios/CSRF)
-CSRF_TRUSTED_ORIGINS = [
-    'https://ds2-2-front.vercel.app',
-]
-
-# Limitar CORS a rutas de API
-CORS_URLS_REGEX = r'^/api/.*$'
+CORS_ALLOW_CREDENTIALS = True
 
 # Media files configuration
 MEDIA_URL = '/media/'
@@ -264,8 +274,8 @@ EMAIL_HOST_USER = env('EMAIL_HOST_USER', default='sado56hdgm@gmail.com')
 EMAIL_HOST_PASSWORD = env('EMAIL_HOST_PASSWORD', default='orfl vkzn dern pbos')
 DEFAULT_FROM_EMAIL = env('DEFAULT_FROM_EMAIL', default='Soporte DS2 <sado56hdgm@gmail.com>')
 # URL pública base para construir enlaces en correos
-PUBLIC_BASE_URL = env('PUBLIC_BASE_URL', default='http://localhost:8000')
+PUBLIC_BASE_URL = "http://localhost:8000"
 # URL del frontend para enlaces de reset de contraseña
-FRONTEND_BASE_URL = env('FRONTEND_BASE_URL', default='http://localhost:5173')
+FRONTEND_BASE_URL = "http://localhost:5173"
 # Static files configuration for production
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
