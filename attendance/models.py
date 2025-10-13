@@ -120,3 +120,4 @@ class Incapacity(models.Model):
     def duration_days(self):
         """Calcula la duración de la incapacidad en días"""
         return (self.end_date - self.start_date).days + 1  # +1 porque el día final cuenta
+

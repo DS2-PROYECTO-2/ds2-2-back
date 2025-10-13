@@ -123,7 +123,7 @@ class RoomEntry(models.Model):
         if hours > 0:
             return f"{hours}h {minutes}m"
         return f"{minutes}m"
-    
+
     @classmethod
     def create_with_reused_id(cls, **kwargs):
         """

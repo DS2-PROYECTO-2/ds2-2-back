@@ -20,3 +20,4 @@ urlpatterns = [
     # PUT/PATCH /incapacities/{id}/ - Actualizar incapacidad
     # DELETE /incapacities/{id}/ - Eliminar incapacidad
 ]
+
