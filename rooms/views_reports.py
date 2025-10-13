@@ -722,23 +722,42 @@ def calculate_report_stats(request):
                 if overlap > 0:
                     total_worked_hours += overlap
         
-        # Calcular llegadas tarde
+        # Calcular llegadas tarde (lógica actualizada: 10 min antes permitidos, 5 min de gracia)
         late_count = 0
+        processed_entries = set()
+        
+        EARLY_ALLOW_MINUTES = 10
+        GRACE_MINUTES = 5
+        
         for schedule in schedules:
             schedule_start = schedule.start_datetime
             
+            # Considerar entradas desde 10 minutos antes del inicio del turno, mismo día y sala
+            window_start = schedule_start - timedelta(minutes=EARLY_ALLOW_MINUTES)
+            
             schedule_entries = RoomEntry.objects.filter(
                 user=schedule.user,
-                entry_time__gte=schedule_start
+                room=schedule.room,
+                entry_time__date=schedule_start.date(),
+                entry_time__gte=window_start
             ).order_by('entry_time')
             
             if schedule_entries.exists():
                 first_entry = schedule_entries.first()
                 entry_time = first_entry.entry_time
                 
-                time_diff = (entry_time - schedule_start).total_seconds() / 60
-                if time_diff > 20:
-                    late_count += 1
+                if first_entry.id not in processed_entries:
+                    # Diferencia en minutos respecto al inicio del turno (puede ser negativa si entró antes)
+                    time_diff = (entry_time - schedule_start).total_seconds() / 60
+                    
+                    # Entradas hasta 10 min antes no cuentan como tarde (se normaliza a 0)
+                    effective_delay = 0 if -EARLY_ALLOW_MINUTES <= time_diff <= 0 else time_diff
+                    
+                    # Llegada tarde si supera los 5 minutos de gracia
+                    if effective_delay > GRACE_MINUTES:
+                        late_count += 1
+                    
+                    processed_entries.add(first_entry.id)
         
         # Calcular horas asignadas
         total_assigned_hours = 0
