@@ -225,6 +225,19 @@ CORS_ALLOWED_ORIGINS = [
 
 CORS_ALLOW_CREDENTIALS = True
 
+# Permitir también subdominios de Vercel (previews):
+CORS_ALLOWED_ORIGIN_REGEXES = [r"^https:\/\/.*\.vercel\.app$"]
+
+# Asegurar preflights con métodos y headers típicos
+from corsheaders.defaults import default_headers, default_methods
+CORS_ALLOW_METHODS = list(default_methods) + [
+    "OPTIONS",
+]
+CORS_ALLOW_HEADERS = list(default_headers) + [
+    "authorization",
+    "content-type",
+]
+
 # Frontend de confianza para CSRF (si en el futuro se usan formularios/CSRF)
 CSRF_TRUSTED_ORIGINS = [
     'https://ds2-2-front.vercel.app',
