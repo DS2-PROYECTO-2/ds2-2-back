@@ -1,15 +1,14 @@
-name: CI
+﻿name: CI
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [ main, develop, produccion ]
   pull_request:
-    branches: [ main, develop ]
+    branches: [ main, develop, produccion ]
 
 jobs:
   build-test:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
     strategy:
       matrix:
         python-version: [ "3.11" ]
@@ -27,29 +26,26 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements*.txt') }}
+          key: ${{ runner.os }}-pip-v4-${{ hashFiles('**/requirements*.txt') }}
           restore-keys: |
-            ${{ runner.os }}-pip-
+            ${{ runner.os }}-pip-v4-
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          echo "Installing Django and dependencies..."
-          pip install --no-cache-dir "Django>=4.2,<5.0"
-          pip install --no-cache-dir "djangorestframework==3.14.0"
-          pip install --no-cache-dir "django-cors-headers==4.9.0"
-          pip install --no-cache-dir "Pillow==10.4.0"
-          pip install --no-cache-dir "python-decouple==3.8"
-          pip install --no-cache-dir "django-environ==0.11.2"
-          pip install --no-cache-dir "requests>=2.25.0"
-          pip install --no-cache-dir "psycopg2-binary>=2.9.0"
-          echo "Verifying installation..."
-          pip list
-          python -c "import django; print(f'Django version: {django.get_version()}')"
+          pip install -r requirements.txt
+          echo "=== Verifying critical packages ==="
+          pip list | grep -i -E "whitenoise|dj-database-url|Django|djangorestframework"
+
+      - name: Verify pytest installation
+        run: |
+          pip list | grep pytest
+          python -c "import pytest; print(f'pytest version: {pytest.__version__}')"
 
       - name: Django checks
         env:
-          DJANGO_SETTINGS_MODULE: ds2_back.settings
+          SECRET_KEY: test-secret-key-for-ci-github-actions
+          DEBUG: "False"
         run: |
           python manage.py check
           python manage.py makemigrations --check --dry-run
@@ -57,5 +53,7 @@ jobs:
       - name: Run tests
         env:
           DJANGO_SETTINGS_MODULE: ds2_back.settings
+          SECRET_KEY: test-secret-key-for-ci-github-actions
+          DEBUG: "False"
         run: |
           python manage.py test --verbosity 1 --keepdb
