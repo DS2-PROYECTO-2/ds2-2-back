@@ -7,6 +7,8 @@ djangorestframework==3.14.0
 
 # Database
 psycopg==3.2.10  # PostgreSQL adapter
+psycopg2-binary==2.9.9  # Alternative PostgreSQL adapter
+dj-database-url==2.1.0  # Database URL parsing for production
 django-cors-headers==4.3.1  # CORS handling
 
 # Authentication & Security
@@ -33,6 +35,7 @@ pytz==2023.3  # Timezone handling
 # Production
 gunicorn==21.2.0  # WSGI server
 whitenoise==6.6.0  # Static files serving
+django-environ==0.11.2  # Environment variables for production
 
 # Email
 django-anymail==10.2  # Email backend
