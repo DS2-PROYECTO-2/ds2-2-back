@@ -24,6 +24,22 @@ EMAIL_BACKEND = 'django.core.mail.backends.locmem.EmailBackend'
 PUBLIC_BASE_URL = "http://testserver"
 FRONTEND_BASE_URL = "http://testserver"
 
+# Middleware sin WhiteNoise para tests
+MIDDLEWARE = [
+    'corsheaders.middleware.CorsMiddleware',
+    'django.middleware.security.SecurityMiddleware',
+    'django.contrib.sessions.middleware.SessionMiddleware',
+    'django.middleware.common.CommonMiddleware',
+    'django.middleware.csrf.CsrfViewMiddleware',
+    'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'django.contrib.messages.middleware.MessageMiddleware',
+    'django.middleware.clickjacking.XFrameOptionsMiddleware',
+]
+
+# Configuración de archivos estáticos simplificada para tests
+STATIC_URL = '/static/'
+STATIC_ROOT = BASE_DIR / 'staticfiles_test'
+
 # Deshabilitar migraciones para tests más rápidos
 class DisableMigrations:
     def __contains__(self, item):
