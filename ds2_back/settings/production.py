@@ -1,4 +1,5 @@
 from .base import *
+import dj_database_url
 
 # Configuración de producción (sin .env)
 DEBUG = env.bool('DEBUG', default=False)
@@ -6,8 +7,6 @@ DEBUG = env.bool('DEBUG', default=False)
 ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=['*'])
 
 # Base de datos desde DATABASE_URL (Render)
-import dj_database_url
-
 DATABASES = {
     'default': dj_database_url.parse(env('DATABASE_URL'))
 }
@@ -26,9 +25,14 @@ SECURE_HSTS_PRELOAD = True
 # CORS para producción
 CORS_ALLOWED_ORIGINS = env.list('CORS_ALLOWED_ORIGINS', default=[])
 CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOW_ALL_ORIGINS = env.bool('CORS_ALLOW_ALL_ORIGINS', default=False)  # Para testing
 
 # CSRF trusted origins
 CSRF_TRUSTED_ORIGINS = env.list('CSRF_TRUSTED_ORIGINS', default=[])
+
+# Configuración para APIs y testing con Postman
+DISABLE_CSRF_FOR_API = env.bool('DISABLE_CSRF_FOR_API', default=False)
+
 
 # Email para producción
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
