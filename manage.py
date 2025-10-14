@@ -6,7 +6,12 @@ import sys
 
 def main():
     """Run administrative tasks."""
+    # Detectar si estamos en tests
+    if 'test' in sys.argv or 'pytest' in sys.modules:
+        os.environ.setdefault('DJANGO_ENV', 'testing')
+    
     os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'ds2_back.settings')
+    
     try:
         from django.core.management import execute_from_command_line
     except ImportError as exc:
@@ -20,5 +25,4 @@ def main():
 
 if __name__ == '__main__':
     main()
-
 
