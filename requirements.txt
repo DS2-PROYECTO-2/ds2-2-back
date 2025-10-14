@@ -7,7 +7,7 @@ djangorestframework==3.14.0
 
 # Database
 psycopg2-binary==2.9.9  # PostgreSQL adapter
-dj-database-url==3.0.1  # Database URL parser
+dj-database-url==3.0.1  # Database URL parser para Render
 django-cors-headers==4.3.1  # CORS handling
 
 # Authentication & Security

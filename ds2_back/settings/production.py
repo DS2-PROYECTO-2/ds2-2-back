@@ -1,5 +1,4 @@
 from .base import *
-import dj_database_url
 
 # Configuración de producción (sin .env)
 DEBUG = env.bool('DEBUG', default=False)
@@ -7,6 +6,8 @@ DEBUG = env.bool('DEBUG', default=False)
 ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=['*'])
 
 # Base de datos desde DATABASE_URL (Render)
+import dj_database_url
+
 DATABASES = {
     'default': dj_database_url.parse(env('DATABASE_URL'))
 }
