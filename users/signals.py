@@ -9,6 +9,7 @@ from urllib.parse import quote
 import threading
 import secrets
 import hashlib
+import sys
 
 from .models import User, ApprovalLink
 from notifications.models import Notification
@@ -101,25 +102,17 @@ def notify_admin_new_user_registration(sender, instance, created, **kwargs):
                 print(f"[EMAIL_DEBUG] Admin emails: {admin_emails}")
                 print(f"[EMAIL_DEBUG] From email: {settings.DEFAULT_FROM_EMAIL}")
                 
-                # TEMPORAL: Usar solo consola para que funcione
-                print(f"[EMAIL_DEBUG] Usando backend de consola (temporal)...")
+                # Enviar email real (funciona en tests y producción)
+                send_mail(
+                    subject=subject,
+                    message=texto,
+                    from_email=settings.DEFAULT_FROM_EMAIL,
+                    recipient_list=admin_emails,
+                    html_message=html,
+                    fail_silently=True,
+                )
                 
-                # Simular envío de correo (aparecerá en logs)
-                print(f"\n{'='*60}")
-                print(f"CORREO PARA ADMINISTRADORES")
-                print(f"{'='*60}")
-                print(f"Para: {', '.join(admin_emails)}")
-                print(f"Asunto: {subject}")
-                print(f"De: {settings.DEFAULT_FROM_EMAIL}")
-                print(f"{'='*60}")
-                print(f"TEXTO:")
-                print(texto)
-                print(f"{'='*60}")
-                print(f"HTML:")
-                print(html)
-                print(f"{'='*60}\n")
-                
-                print(f"[EMAIL_SUCCESS] Correo mostrado en logs (backend consola)")
+                print(f"[EMAIL_SUCCESS] Correo enviado a {len(admin_emails)} admins")
                 
             except Exception as e:
                 # Log explícito para depurar problemas de email
@@ -127,7 +120,11 @@ def notify_admin_new_user_registration(sender, instance, created, **kwargs):
                 import traceback
                 print(f"[EMAIL_ERROR] Traceback completo: {traceback.format_exc()}")
 
-        if is_test_backend:
+        # En tests, ejecutar sincrónicamente para que mail.outbox funcione
+        # En producción, usar hilo asíncrono para no bloquear
+        is_testing = getattr(settings, 'TESTING', False) or 'test' in sys.argv
+        
+        if is_testing or is_test_backend:
             _send()
         else:
             threading.Thread(target=_send, daemon=True).start()
