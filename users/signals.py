@@ -76,8 +76,8 @@ def notify_admin_new_user_registration(sender, instance, created, **kwargs):
                 approve_url = f"{base}{reverse('admin_user_activate')}?token={quote(approve_token, safe='')}"
                 reject_url = f"{base}{reverse('admin_user_delete')}?token={quote(reject_token, safe='')}"
 
-                # OPTIMIZACIÓN 5: Email en hilo separado
-                def send_email_async():
+                # SOLUCIÓN TEMPORAL: Email síncrono para garantizar envío
+                try:
                     send_admin_notification_email_async(
                         admin_emails,
                         instance.get_full_name(),
@@ -86,11 +86,9 @@ def notify_admin_new_user_registration(sender, instance, created, **kwargs):
                         approve_url,
                         reject_url
                     )
-                
-                # Ejecutar email en hilo separado
-                thread = threading.Thread(target=send_email_async)
-                thread.daemon = True
-                thread.start()
+                    logger.info(f"Email de notificación enviado a {len(admin_emails)} administradores")
+                except Exception as e:
+                    logger.error(f"Error enviando email de notificación: {e}")
                 
                 # Solo mostrar enlaces en consola si está en modo consola
                 if settings.EMAIL_BACKEND == 'django.core.mail.backends.console.EmailBackend':
@@ -146,18 +144,17 @@ def notify_user_verification_status(sender, instance, **kwargs):
                     related_object_id=instance.id
                 )
                 
-                # OPTIMIZACIÓN: Email asíncrono
-                def send_verification_email():
+                # SOLUCIÓN TEMPORAL: Email síncrono para garantizar envío
+                try:
                     send_verification_email_async(
                         instance.email,
                         instance.get_full_name(),
                         verifier_name,
                         is_verified=True
                     )
-                
-                thread = threading.Thread(target=send_verification_email)
-                thread.daemon = True
-                thread.start()
+                    logger.info(f"Email de verificación enviado a {instance.email}")
+                except Exception as e:
+                    logger.error(f"Error enviando email de verificación: {e}")
                 
             else:
                 # Rechazo / desverificación
@@ -169,17 +166,16 @@ def notify_user_verification_status(sender, instance, **kwargs):
                     related_object_id=instance.id
                 )
                 
-                # OPTIMIZACIÓN: Email asíncrono
-                def send_rejection_email():
+                # SOLUCIÓN TEMPORAL: Email síncrono para garantizar envío
+                try:
                     send_verification_email_async(
                         instance.email,
                         instance.get_full_name(),
                         is_verified=False
                     )
-                
-                thread = threading.Thread(target=send_rejection_email)
-                thread.daemon = True
-                thread.start()
+                    logger.info(f"Email de desverificación enviado a {instance.email}")
+                except Exception as e:
+                    logger.error(f"Error enviando email de desverificación: {e}")
 
             # Limpiar el flag
             delattr(instance, '_verification_changed')
@@ -196,16 +192,15 @@ def notify_user_on_delete(sender, instance, **kwargs):
     """
     if instance.email:
         try:
-            # OPTIMIZACIÓN: Email asíncrono
-            def send_deletion_email():
+            # SOLUCIÓN TEMPORAL: Email síncrono para garantizar envío
+            try:
                 send_user_deletion_email_async(
                     instance.email,
                     instance.get_full_name()
                 )
-            
-            thread = threading.Thread(target=send_deletion_email)
-            thread.daemon = True
-            thread.start()
+                logger.info(f"Email de eliminación enviado a {instance.email}")
+            except Exception as e:
+                logger.error(f"Error enviando email de eliminación: {e}")
             
         except Exception as e:
             logger.error(f"Error en notify_user_on_delete: {e}")
