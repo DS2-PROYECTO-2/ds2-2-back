@@ -103,10 +103,11 @@ def notify_admin_new_user_registration(sender, instance, created, **kwargs):
                     from_email=settings.DEFAULT_FROM_EMAIL,
                     recipient_list=admin_emails,
                     html_message=html,
-                    fail_silently=True,
+                    fail_silently=getattr(settings, 'EMAIL_FAIL_SILENTLY', True),
                 )
-            except Exception:
-                pass
+            except Exception as e:
+                # Log explícito para depurar problemas de SMTP en producción gratuita
+                print(f"[EMAIL_ERROR] Error enviando correo a admins: {e}")
 
         if is_test_backend:
             _send()
