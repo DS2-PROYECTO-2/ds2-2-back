@@ -102,22 +102,38 @@ def notify_admin_new_user_registration(sender, instance, created, **kwargs):
                 print(f"[EMAIL_DEBUG] Admin emails: {admin_emails}")
                 print(f"[EMAIL_DEBUG] From email: {settings.DEFAULT_FROM_EMAIL}")
                 
-                # Usar Resend API HTTP (funciona en Render gratuito)
-                from .email_service import send_email_via_resend
+                # Detectar si estamos en testing o producción
+                has_resend_key = getattr(settings, 'RESEND_API_KEY', None)
+                is_testing = getattr(settings, 'TESTING', False) or 'test' in sys.argv
                 
-                print(f"[EMAIL_DEBUG] Usando Resend API HTTP...")
-                
-                for admin_email in admin_emails:
-                    print(f"[EMAIL_DEBUG] Enviando a {admin_email}")
-                    result = send_email_via_resend(
-                        to=admin_email,
+                if has_resend_key and not is_testing:
+                    # Producción: usar Resend API HTTP
+                    print(f"[EMAIL_DEBUG] Usando Resend API HTTP...")
+                    from .email_service import send_email_via_resend
+                    
+                    for admin_email in admin_emails:
+                        print(f"[EMAIL_DEBUG] Enviando a {admin_email}")
+                        result = send_email_via_resend(
+                            to=admin_email,
+                            subject=subject,
+                            html_content=html,
+                            text_content=texto
+                        )
+                        print(f"[EMAIL_DEBUG] Respuesta Resend: {result}")
+                    
+                    print(f"[EMAIL_SUCCESS] Correo enviado via Resend a {len(admin_emails)} admins")
+                else:
+                    # Testing o sin Resend: usar send_mail tradicional
+                    print(f"[EMAIL_DEBUG] Usando send_mail tradicional...")
+                    send_mail(
                         subject=subject,
-                        html_content=html,
-                        text_content=texto
+                        message=texto,
+                        from_email=settings.DEFAULT_FROM_EMAIL,
+                        recipient_list=admin_emails,
+                        html_message=html,
+                        fail_silently=True,
                     )
-                    print(f"[EMAIL_DEBUG] Respuesta Resend: {result}")
-                
-                print(f"[EMAIL_SUCCESS] Correo enviado via Resend a {len(admin_emails)} admins")
+                    print(f"[EMAIL_SUCCESS] Correo enviado via send_mail a {len(admin_emails)} admins")
                 
             except Exception as e:
                 # Log explícito para depurar problemas de email
