@@ -8,7 +8,16 @@ ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=['*'])
 
 # Base de datos desde DATABASE_URL (Render)
 DATABASES = {
-    'default': dj_database_url.parse(env('DATABASE_URL'))
+    'default': dj_database_url.parse(
+        env('DATABASE_URL'),
+        conn_max_age=600,
+        conn_health_checks=True,
+    )
+}
+
+# Configuración SSL para PostgreSQL en Render
+DATABASES['default']['OPTIONS'] = {
+    'sslmode': 'require',
 }
 
 # Security settings
