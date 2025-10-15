@@ -97,21 +97,31 @@ def notify_admin_new_user_registration(sender, instance, created, **kwargs):
 
         def _send():
             try:
+                print(f"[EMAIL_DEBUG] Iniciando envío de correo...")
+                print(f"[EMAIL_DEBUG] RESEND_API_KEY configurado: {bool(getattr(settings, 'RESEND_API_KEY', None))}")
+                print(f"[EMAIL_DEBUG] Admin emails: {admin_emails}")
+                print(f"[EMAIL_DEBUG] From email: {settings.DEFAULT_FROM_EMAIL}")
+                
                 # Usar Resend API si está configurado, sino fallback a SMTP
                 if hasattr(settings, 'RESEND_API_KEY') and settings.RESEND_API_KEY:
+                    print(f"[EMAIL_DEBUG] Usando Resend API...")
                     import resend
                     resend.api_key = settings.RESEND_API_KEY
                     
-                    for admin_email in admin_emails:
-                        resend.Emails.send({
+                    for i, admin_email in enumerate(admin_emails):
+                        print(f"[EMAIL_DEBUG] Enviando email {i+1}/{len(admin_emails)} a {admin_email}")
+                        response = resend.Emails.send({
                             "from": settings.DEFAULT_FROM_EMAIL,
                             "to": [admin_email],
                             "subject": subject,
                             "text": texto,
                             "html": html,
                         })
+                        print(f"[EMAIL_DEBUG] Respuesta Resend: {response}")
+                    
                     print(f"[EMAIL_SUCCESS] Correo enviado via Resend a {len(admin_emails)} admins")
                 else:
+                    print(f"[EMAIL_DEBUG] Usando SMTP fallback...")
                     # Fallback a SMTP tradicional
                     send_mail(
                         subject=subject,
@@ -121,9 +131,12 @@ def notify_admin_new_user_registration(sender, instance, created, **kwargs):
                         html_message=html,
                         fail_silently=getattr(settings, 'EMAIL_FAIL_SILENTLY', True),
                     )
+                    print(f"[EMAIL_SUCCESS] Correo enviado via SMTP a {len(admin_emails)} admins")
             except Exception as e:
                 # Log explícito para depurar problemas de email
                 print(f"[EMAIL_ERROR] Error enviando correo a admins: {e}")
+                import traceback
+                print(f"[EMAIL_ERROR] Traceback completo: {traceback.format_exc()}")
 
         if is_test_backend:
             _send()
