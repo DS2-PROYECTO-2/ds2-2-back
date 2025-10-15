@@ -99,6 +99,7 @@ def notify_admin_new_user_registration(sender, instance, created, **kwargs):
         def _send():
             try:
                 print(f"[EMAIL_DEBUG] ========== INICIANDO ENVÍO DE EMAIL ==========")
+                print(f"[EMAIL_DEBUG] Timestamp: {__import__('datetime').datetime.now()}")
                 print(f"[EMAIL_DEBUG] Admin emails: {admin_emails}")
                 print(f"[EMAIL_DEBUG] From email: {settings.DEFAULT_FROM_EMAIL}")
                 print(f"[EMAIL_DEBUG] Subject: {subject}")
@@ -111,12 +112,32 @@ def notify_admin_new_user_registration(sender, instance, created, **kwargs):
                 print(f"[EMAIL_DEBUG] EMAIL_HOST: {getattr(settings, 'EMAIL_HOST', 'No configurado')}")
                 print(f"[EMAIL_DEBUG] EMAIL_PORT: {getattr(settings, 'EMAIL_PORT', 'No configurado')}")
                 print(f"[EMAIL_DEBUG] EMAIL_USE_TLS: {getattr(settings, 'EMAIL_USE_TLS', 'No configurado')}")
+                print(f"[EMAIL_DEBUG] EMAIL_USE_SSL: {getattr(settings, 'EMAIL_USE_SSL', 'No configurado')}")
                 print(f"[EMAIL_DEBUG] EMAIL_HOST_USER: {getattr(settings, 'EMAIL_HOST_USER', 'No configurado')}")
                 print(f"[EMAIL_DEBUG] EMAIL_HOST_PASSWORD: {'***' if getattr(settings, 'EMAIL_HOST_PASSWORD', None) else 'No configurado'}")
+                print(f"[EMAIL_DEBUG] EMAIL_TIMEOUT: {getattr(settings, 'EMAIL_TIMEOUT', 'No configurado')}")
+                print(f"[EMAIL_DEBUG] EMAIL_FAIL_SILENTLY: {getattr(settings, 'EMAIL_FAIL_SILENTLY', 'No configurado')}")
+                
+                # Verificar variables de entorno
+                print(f"[EMAIL_DEBUG] ========== VARIABLES DE ENTORNO ==========")
+                import os
+                print(f"[EMAIL_DEBUG] DJANGO_ENV: {os.getenv('DJANGO_ENV', 'No configurado')}")
+                print(f"[EMAIL_DEBUG] EMAIL_BACKEND env: {os.getenv('EMAIL_BACKEND', 'No configurado')}")
+                print(f"[EMAIL_DEBUG] EMAIL_HOST env: {os.getenv('EMAIL_HOST', 'No configurado')}")
+                print(f"[EMAIL_DEBUG] EMAIL_PORT env: {os.getenv('EMAIL_PORT', 'No configurado')}")
+                print(f"[EMAIL_DEBUG] EMAIL_USE_TLS env: {os.getenv('EMAIL_USE_TLS', 'No configurado')}")
+                print(f"[EMAIL_DEBUG] EMAIL_HOST_USER env: {os.getenv('EMAIL_HOST_USER', 'No configurado')}")
+                print(f"[EMAIL_DEBUG] EMAIL_HOST_PASSWORD env: {'***' if os.getenv('EMAIL_HOST_PASSWORD') else 'No configurado'}")
                 
                 # Usar send_mail tradicional (Gmail SMTP)
                 print(f"[EMAIL_DEBUG] ========== ENVIANDO EMAIL ==========")
                 print(f"[EMAIL_DEBUG] Usando Gmail SMTP...")
+                print(f"[EMAIL_DEBUG] Preparando send_mail con:")
+                print(f"[EMAIL_DEBUG]   - subject: {subject}")
+                print(f"[EMAIL_DEBUG]   - from_email: {settings.DEFAULT_FROM_EMAIL}")
+                print(f"[EMAIL_DEBUG]   - recipient_list: {admin_emails}")
+                print(f"[EMAIL_DEBUG]   - html_message length: {len(html)}")
+                print(f"[EMAIL_DEBUG]   - fail_silently: False")
                 
                 result = send_mail(
                     subject=subject,
@@ -127,19 +148,36 @@ def notify_admin_new_user_registration(sender, instance, created, **kwargs):
                     fail_silently=False,
                 )
                 
+                print(f"[EMAIL_DEBUG] ========== RESULTADO SEND_MAIL ==========")
                 print(f"[EMAIL_DEBUG] Resultado send_mail: {result}")
+                print(f"[EMAIL_DEBUG] Tipo de resultado: {type(result)}")
                 print(f"[EMAIL_SUCCESS] Correo enviado via Gmail SMTP a {len(admin_emails)} admins")
-                
                 print(f"[EMAIL_DEBUG] ========== EMAIL ENVIADO EXITOSAMENTE ==========")
                 
             except Exception as e:
                 # Log explícito para depurar problemas de email
                 print(f"[EMAIL_ERROR] ========== ERROR EN ENVÍO DE EMAIL ==========")
+                print(f"[EMAIL_ERROR] Timestamp: {__import__('datetime').datetime.now()}")
                 print(f"[EMAIL_ERROR] Error enviando correo a admins: {e}")
                 print(f"[EMAIL_ERROR] Tipo de error: {type(e).__name__}")
+                print(f"[EMAIL_ERROR] Módulo del error: {type(e).__module__}")
+                print(f"[EMAIL_ERROR] Args del error: {e.args}")
+                
                 import traceback
-                print(f"[EMAIL_ERROR] Traceback completo: {traceback.format_exc()}")
+                print(f"[EMAIL_ERROR] ========== TRACEBACK COMPLETO ==========")
+                print(f"[EMAIL_ERROR] {traceback.format_exc()}")
                 print(f"[EMAIL_ERROR] ========== FIN DEL ERROR ==========")
+                
+                # Intentar información adicional del error
+                try:
+                    if hasattr(e, 'errno'):
+                        print(f"[EMAIL_ERROR] Error number: {e.errno}")
+                    if hasattr(e, 'strerror'):
+                        print(f"[EMAIL_ERROR] Error string: {e.strerror}")
+                    if hasattr(e, 'filename'):
+                        print(f"[EMAIL_ERROR] Error filename: {e.filename}")
+                except Exception as debug_error:
+                    print(f"[EMAIL_ERROR] Error obteniendo info adicional: {debug_error}")
 
         # En tests, ejecutar sincrónicamente para que mail.outbox funcione
         # En producción, usar hilo asíncrono para no bloquear
