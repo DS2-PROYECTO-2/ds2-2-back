@@ -118,6 +118,11 @@ def notify_admin_new_user_registration(sender, instance, created, **kwargs):
                 has_sendgrid_key = getattr(settings, 'SENDGRID_API_KEY', None)
                 is_testing = getattr(settings, 'TESTING', False) or 'test' in sys.argv
                 
+                print(f"[EMAIL_DEBUG] ========== DETECCIÓN DE SENDGRID ==========")
+                print(f"[EMAIL_DEBUG] SENDGRID_API_KEY: {'***' if has_sendgrid_key else 'No configurado'}")
+                print(f"[EMAIL_DEBUG] is_testing: {is_testing}")
+                print(f"[EMAIL_DEBUG] has_sendgrid_key and not is_testing: {has_sendgrid_key and not is_testing}")
+                
                 if has_sendgrid_key and not is_testing:
                     # Producción: usar SendGrid API HTTP
                     print(f"[EMAIL_DEBUG] ========== ENVIANDO EMAIL ==========")
