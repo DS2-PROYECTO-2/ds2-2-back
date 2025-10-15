@@ -26,7 +26,7 @@ services:
       - key: FRONTEND_BASE_URL
         value: "https://ds2-2-front.vercel.app"
       - key: RESEND_API_KEY
-        value: "re_hyaxg319_CM6jSK3wUM34t7Sp9LRxjyGU"
+        value: "re_ZTkTN38z_HpLGMd21G5ATbukd8AHPPPkg"
       - key: DEFAULT_FROM_EMAIL
         value: "Soporte DS2 <onboarding@resend.dev>"
 
