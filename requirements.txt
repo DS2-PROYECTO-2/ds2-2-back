@@ -39,7 +39,7 @@ whitenoise==6.6.0  # Static files serving
 
 # Email
 django-anymail==10.2  # Email backend
-resend==0.8.0  # Resend API para emails
+requests==2.31.0  # Para Resend API HTTP
 
 # Validation & Forms
 django-crispy-forms==2.1  # Better forms

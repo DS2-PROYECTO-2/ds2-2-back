@@ -102,17 +102,22 @@ def notify_admin_new_user_registration(sender, instance, created, **kwargs):
                 print(f"[EMAIL_DEBUG] Admin emails: {admin_emails}")
                 print(f"[EMAIL_DEBUG] From email: {settings.DEFAULT_FROM_EMAIL}")
                 
-                # Enviar email real (funciona en tests y producción)
-                send_mail(
-                    subject=subject,
-                    message=texto,
-                    from_email=settings.DEFAULT_FROM_EMAIL,
-                    recipient_list=admin_emails,
-                    html_message=html,
-                    fail_silently=True,
-                )
+                # Usar Resend API HTTP (funciona en Render gratuito)
+                from .email_service import send_email_via_resend
                 
-                print(f"[EMAIL_SUCCESS] Correo enviado a {len(admin_emails)} admins")
+                print(f"[EMAIL_DEBUG] Usando Resend API HTTP...")
+                
+                for admin_email in admin_emails:
+                    print(f"[EMAIL_DEBUG] Enviando a {admin_email}")
+                    result = send_email_via_resend(
+                        to=admin_email,
+                        subject=subject,
+                        html_content=html,
+                        text_content=texto
+                    )
+                    print(f"[EMAIL_DEBUG] Respuesta Resend: {result}")
+                
+                print(f"[EMAIL_SUCCESS] Correo enviado via Resend a {len(admin_emails)} admins")
                 
             except Exception as e:
                 # Log explícito para depurar problemas de email
