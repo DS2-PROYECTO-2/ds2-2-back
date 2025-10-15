@@ -105,21 +105,48 @@ def notify_admin_new_user_registration(sender, instance, created, **kwargs):
                 # Usar Resend API si está configurado, sino fallback a SMTP
                 if hasattr(settings, 'RESEND_API_KEY') and settings.RESEND_API_KEY:
                     print(f"[EMAIL_DEBUG] Usando Resend API...")
-                    import resend
-                    resend.api_key = settings.RESEND_API_KEY
-                    
-                    for i, admin_email in enumerate(admin_emails):
-                        print(f"[EMAIL_DEBUG] Enviando email {i+1}/{len(admin_emails)} a {admin_email}")
-                        response = resend.Emails.send({
-                            "from": settings.DEFAULT_FROM_EMAIL,
-                            "to": [admin_email],
-                            "subject": subject,
-                            "text": texto,
-                            "html": html,
-                        })
-                        print(f"[EMAIL_DEBUG] Respuesta Resend: {response}")
-                    
-                    print(f"[EMAIL_SUCCESS] Correo enviado via Resend a {len(admin_emails)} admins")
+                    try:
+                        import resend
+                        print(f"[EMAIL_DEBUG] Resend importado correctamente")
+                        resend.api_key = settings.RESEND_API_KEY
+                        print(f"[EMAIL_DEBUG] API key configurada")
+                        
+                        for i, admin_email in enumerate(admin_emails):
+                            print(f"[EMAIL_DEBUG] Enviando email {i+1}/{len(admin_emails)} a {admin_email}")
+                            response = resend.Emails.send({
+                                "from": settings.DEFAULT_FROM_EMAIL,
+                                "to": [admin_email],
+                                "subject": subject,
+                                "text": texto,
+                                "html": html,
+                            })
+                            print(f"[EMAIL_DEBUG] Respuesta Resend: {response}")
+                        
+                        print(f"[EMAIL_SUCCESS] Correo enviado via Resend a {len(admin_emails)} admins")
+                    except ImportError as e:
+                        print(f"[EMAIL_ERROR] Error importando Resend: {e}")
+                        print(f"[EMAIL_DEBUG] Fallback a SMTP...")
+                        # Fallback a SMTP si Resend no está disponible
+                        send_mail(
+                            subject=subject,
+                            message=texto,
+                            from_email=settings.DEFAULT_FROM_EMAIL,
+                            recipient_list=admin_emails,
+                            html_message=html,
+                            fail_silently=True,
+                        )
+                    except Exception as resend_error:
+                        print(f"[EMAIL_ERROR] Error con Resend API: {resend_error}")
+                        print(f"[EMAIL_DEBUG] Fallback a SMTP...")
+                        # Fallback a SMTP si Resend falla
+                        send_mail(
+                            subject=subject,
+                            message=texto,
+                            from_email=settings.DEFAULT_FROM_EMAIL,
+                            recipient_list=admin_emails,
+                            html_message=html,
+                            fail_silently=True,
+                        )
                 else:
                     print(f"[EMAIL_DEBUG] Usando SMTP fallback...")
                     # Fallback a SMTP tradicional
