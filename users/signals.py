@@ -98,31 +98,47 @@ def notify_admin_new_user_registration(sender, instance, created, **kwargs):
 
         def _send():
             try:
-                print(f"[EMAIL_DEBUG] Iniciando envío de correo...")
+                print(f"[EMAIL_DEBUG] ========== INICIANDO ENVÍO DE EMAIL ==========")
                 print(f"[EMAIL_DEBUG] Admin emails: {admin_emails}")
                 print(f"[EMAIL_DEBUG] From email: {settings.DEFAULT_FROM_EMAIL}")
+                print(f"[EMAIL_DEBUG] Subject: {subject}")
+                print(f"[EMAIL_DEBUG] Text content length: {len(texto)}")
+                print(f"[EMAIL_DEBUG] HTML content length: {len(html)}")
                 
-                # Detectar si estamos en testing o producción
-                has_resend_key = getattr(settings, 'RESEND_API_KEY', None)
-                is_testing = getattr(settings, 'TESTING', False) or 'test' in sys.argv
+                # Verificar configuración de email
+                print(f"[EMAIL_DEBUG] ========== CONFIGURACIÓN DE EMAIL ==========")
+                print(f"[EMAIL_DEBUG] EMAIL_BACKEND: {getattr(settings, 'EMAIL_BACKEND', 'No configurado')}")
+                print(f"[EMAIL_DEBUG] EMAIL_HOST: {getattr(settings, 'EMAIL_HOST', 'No configurado')}")
+                print(f"[EMAIL_DEBUG] EMAIL_PORT: {getattr(settings, 'EMAIL_PORT', 'No configurado')}")
+                print(f"[EMAIL_DEBUG] EMAIL_USE_TLS: {getattr(settings, 'EMAIL_USE_TLS', 'No configurado')}")
+                print(f"[EMAIL_DEBUG] EMAIL_HOST_USER: {getattr(settings, 'EMAIL_HOST_USER', 'No configurado')}")
+                print(f"[EMAIL_DEBUG] EMAIL_HOST_PASSWORD: {'***' if getattr(settings, 'EMAIL_HOST_PASSWORD', None) else 'No configurado'}")
                 
-                # Temporalmente usar send_mail hasta que Resend funcione
-                print(f"[EMAIL_DEBUG] Usando send_mail tradicional (temporal)...")
-                send_mail(
+                # Usar send_mail tradicional (funciona en Render)
+                print(f"[EMAIL_DEBUG] ========== ENVIANDO EMAIL ==========")
+                print(f"[EMAIL_DEBUG] Usando send_mail tradicional...")
+                
+                result = send_mail(
                     subject=subject,
                     message=texto,
                     from_email=settings.DEFAULT_FROM_EMAIL,
                     recipient_list=admin_emails,
                     html_message=html,
-                    fail_silently=True,
+                    fail_silently=False,  # Cambiar a False para ver errores
                 )
+                
+                print(f"[EMAIL_DEBUG] Resultado send_mail: {result}")
                 print(f"[EMAIL_SUCCESS] Correo enviado via send_mail a {len(admin_emails)} admins")
+                print(f"[EMAIL_DEBUG] ========== EMAIL ENVIADO EXITOSAMENTE ==========")
                 
             except Exception as e:
                 # Log explícito para depurar problemas de email
+                print(f"[EMAIL_ERROR] ========== ERROR EN ENVÍO DE EMAIL ==========")
                 print(f"[EMAIL_ERROR] Error enviando correo a admins: {e}")
+                print(f"[EMAIL_ERROR] Tipo de error: {type(e).__name__}")
                 import traceback
                 print(f"[EMAIL_ERROR] Traceback completo: {traceback.format_exc()}")
+                print(f"[EMAIL_ERROR] ========== FIN DEL ERROR ==========")
 
         # En tests, ejecutar sincrónicamente para que mail.outbox funcione
         # En producción, usar hilo asíncrono para no bloquear
