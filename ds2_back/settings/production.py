@@ -17,7 +17,7 @@ DATABASES = {
 
 # Configuración SSL para PostgreSQL en Render
 DATABASES['default']['OPTIONS'] = {
-    'sslmode': 'disable',
+    'sslmode': 'require',
 }
 
 # Security settings
