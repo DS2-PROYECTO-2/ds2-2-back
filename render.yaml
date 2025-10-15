@@ -25,20 +25,10 @@ services:
         value: "https://backendpruebas-r4zu.onrender.com"
       - key: FRONTEND_BASE_URL
         value: "https://ds2-2-front.vercel.app"
-      - key: EMAIL_BACKEND
-        value: "django.core.mail.backends.smtp.EmailBackend"
-      - key: EMAIL_HOST
-        value: "smtp.gmail.com"
-      - key: EMAIL_PORT
-        value: "587"
-      - key: EMAIL_USE_TLS
-        value: "true"
-      - key: EMAIL_HOST_USER
-        value: "sado56hdgm@gmail.com"
-      - key: EMAIL_HOST_PASSWORD
-        value: "orfl vkzn dern pbos"
+      - key: SENDGRID_API_KEY
+        value: "SG.tu_api_key_aqui"
       - key: DEFAULT_FROM_EMAIL
-        value: "Soporte DS2 <sado56hdgm@gmail.com>"
+        value: "Soporte DS2 <noreply@ds2.com>"
 
 databases:
   - name: ds2-database

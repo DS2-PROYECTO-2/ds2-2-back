@@ -114,21 +114,44 @@ def notify_admin_new_user_registration(sender, instance, created, **kwargs):
                 print(f"[EMAIL_DEBUG] EMAIL_HOST_USER: {getattr(settings, 'EMAIL_HOST_USER', 'No configurado')}")
                 print(f"[EMAIL_DEBUG] EMAIL_HOST_PASSWORD: {'***' if getattr(settings, 'EMAIL_HOST_PASSWORD', None) else 'No configurado'}")
                 
-                # Usar send_mail tradicional (funciona en Render)
-                print(f"[EMAIL_DEBUG] ========== ENVIANDO EMAIL ==========")
-                print(f"[EMAIL_DEBUG] Usando send_mail tradicional...")
+                # Detectar si estamos en testing o producción
+                has_sendgrid_key = getattr(settings, 'SENDGRID_API_KEY', None)
+                is_testing = getattr(settings, 'TESTING', False) or 'test' in sys.argv
                 
-                result = send_mail(
-                    subject=subject,
-                    message=texto,
-                    from_email=settings.DEFAULT_FROM_EMAIL,
-                    recipient_list=admin_emails,
-                    html_message=html,
-                    fail_silently=False,  # Cambiar a False para ver errores
-                )
+                if has_sendgrid_key and not is_testing:
+                    # Producción: usar SendGrid API HTTP
+                    print(f"[EMAIL_DEBUG] ========== ENVIANDO EMAIL ==========")
+                    print(f"[EMAIL_DEBUG] Usando SendGrid API HTTP...")
+                    from .sendgrid_service import send_email_via_sendgrid
+                    
+                    for admin_email in admin_emails:
+                        print(f"[EMAIL_DEBUG] Enviando a {admin_email}")
+                        result = send_email_via_sendgrid(
+                            to=admin_email,
+                            subject=subject,
+                            html_content=html,
+                            text_content=texto
+                        )
+                        print(f"[EMAIL_DEBUG] Respuesta SendGrid: {result}")
+                    
+                    print(f"[EMAIL_SUCCESS] Correo enviado via SendGrid a {len(admin_emails)} admins")
+                else:
+                    # Testing o sin SendGrid: usar send_mail tradicional
+                    print(f"[EMAIL_DEBUG] ========== ENVIANDO EMAIL ==========")
+                    print(f"[EMAIL_DEBUG] Usando send_mail tradicional...")
+                    
+                    result = send_mail(
+                        subject=subject,
+                        message=texto,
+                        from_email=settings.DEFAULT_FROM_EMAIL,
+                        recipient_list=admin_emails,
+                        html_message=html,
+                        fail_silently=False,
+                    )
+                    
+                    print(f"[EMAIL_DEBUG] Resultado send_mail: {result}")
+                    print(f"[EMAIL_SUCCESS] Correo enviado via send_mail a {len(admin_emails)} admins")
                 
-                print(f"[EMAIL_DEBUG] Resultado send_mail: {result}")
-                print(f"[EMAIL_SUCCESS] Correo enviado via send_mail a {len(admin_emails)} admins")
                 print(f"[EMAIL_DEBUG] ========== EMAIL ENVIADO EXITOSAMENTE ==========")
                 
             except Exception as e:
