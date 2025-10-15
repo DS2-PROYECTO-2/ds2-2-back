@@ -9,7 +9,6 @@ class CustomUserManager(BaseUserManager):
     def create_user(self, identification, username, email, password, **extra_fields):
         """
         Create and save a User with the given identification and password.
-        OPTIMIZADO: Validaciones más eficientes
         """
         if not identification:
             raise ValueError('The identification must be set')
@@ -17,12 +16,8 @@ class CustomUserManager(BaseUserManager):
             raise ValueError('The email must be set')
         
         email = self.normalize_email(email)
-        
-        # OPTIMIZACIÓN: Configuración por defecto más eficiente
         extra_fields.setdefault('is_verified', False)
-        extra_fields.setdefault('is_active', True)
         
-        # OPTIMIZACIÓN: Crear usuario con configuración optimizada
         user = self.model(
             identification=identification,
             username=username,

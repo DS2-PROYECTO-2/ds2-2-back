@@ -20,12 +20,9 @@ from .permissions import IsAdminUser, IsVerifiedUser
 from django.conf import settings
 from .models import ApprovalLink
 import hashlib
-import logging
 from .serializers import PasswordResetRequestSerializer, PasswordResetConfirmSerializer
 from rest_framework.permissions import AllowAny
 from django.db import transaction
-
-logger = logging.getLogger(__name__)
 
 
 
@@ -53,38 +50,29 @@ def _html_message(text: str, ok: bool) -> str:
 def register_view(request):
     """
     Vista para el registro de nuevos usuarios
-    OPTIMIZADA: Respuesta más rápida + manejo de errores mejorado
     """
-    try:
-        serializer = UserRegistrationSerializer(data=request.data)
-        if serializer.is_valid():
-            user = serializer.save()
-            
-            # OPTIMIZACIÓN: Respuesta inmediata sin esperar signals
-            # Los signals se ejecutan en background
-            if user.role == 'monitor':
-                message = 'Usuario registrado exitosamente. Esperando verificación del administrador.'
-            else:
-                message = 'Administrador registrado y verificado exitosamente.'
-            
-            return Response({
-                'message': message,
-                'user': {
-                    'id': user.id,
-                    'username': user.username,
-                    'email': user.email,
-                    'role': user.role,
-                    'is_verified': user.is_verified
-                }
-            }, status=status.HTTP_201_CREATED)
+    serializer = UserRegistrationSerializer(data=request.data)
+    if serializer.is_valid():
+        user = serializer.save()
         
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        # Mensaje diferenciado según el rol
+        if user.role == 'monitor':
+            message = 'Usuario registrado exitosamente. Esperando verificación del administrador.'
+        else:
+            message = 'Administrador registrado y verificado exitosamente.'
         
-    except Exception as e:
-        logger.error(f"Error en register_view: {e}")
         return Response({
-            'error': 'Error interno del servidor. Inténtalo de nuevo.'
-        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            'message': message,
+            'user': {
+                'id': user.id,
+                'username': user.username,
+                'email': user.email,
+                'role': user.role,
+                'is_verified': user.is_verified
+            }
+        }, status=status.HTTP_201_CREATED)
+    
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
 @csrf_exempt

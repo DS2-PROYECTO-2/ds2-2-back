@@ -106,22 +106,6 @@ def notify_admin_new_user_registration(sender, instance, created, **kwargs):
 
 
 @receiver(post_save, sender=User)
-def notify_admin_registration(sender, instance, created, **kwargs):
-    """
-    Signal optimizado para registro de administradores
-    OPTIMIZADO: Solo notificación básica, sin emails pesados
-    """
-    if created and instance.role == 'admin':
-        try:
-            # OPTIMIZACIÓN: Solo crear notificación básica para admins
-            # No enviar emails pesados para admins (se auto-verifican)
-            logger.info(f"Administrador {instance.username} registrado exitosamente")
-            
-        except Exception as e:
-            logger.error(f"Error en notify_admin_registration: {e}")
-
-
-@receiver(post_save, sender=User)
 def notify_user_verification_status(sender, instance, **kwargs):
     """
     Notifica al usuario cuando su estado de verificación cambia
