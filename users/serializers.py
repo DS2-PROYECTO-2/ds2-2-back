@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from django.utils import timezone
+from django.db import models
 from .utils import generate_raw_token, hash_token, build_password_reset_url
 from datetime import timedelta
 from django.contrib.auth import get_user_model
@@ -34,23 +35,25 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
                 'password_confirm': ['Las contraseñas no coinciden']
             })
         
-        # Validar que la identificación no exista
-        if User.objects.filter(identification=attrs['identification']).exists():
-            raise serializers.ValidationError({
-                'identification': ['Ya existe un usuario con esta identificación']
-            })
+        # OPTIMIZACIÓN: Una sola query para validar todos los campos únicos
+        existing_users = User.objects.filter(
+            models.Q(identification=attrs['identification']) |
+            models.Q(username=attrs['username']) |
+            models.Q(email=attrs['email'])
+        ).values('identification', 'username', 'email')
         
-        # Validar que el username no exista
-        if User.objects.filter(username=attrs['username']).exists():
-            raise serializers.ValidationError({
-                'username': ['Ya existe un usuario con este nombre de usuario']
-            })
-        
-        # Validar que el email no exista
-        if User.objects.filter(email=attrs['email']).exists():
-            raise serializers.ValidationError({
-                'email': ['Ya existe un usuario con este email']
-            })
+        if existing_users.exists():
+            user_data = existing_users.first()
+            errors = {}
+            
+            if user_data['identification'] == attrs['identification']:
+                errors['identification'] = ['Ya existe un usuario con esta identificación']
+            if user_data['username'] == attrs['username']:
+                errors['username'] = ['Ya existe un usuario con este nombre de usuario']
+            if user_data['email'] == attrs['email']:
+                errors['email'] = ['Ya existe un usuario con este email']
+            
+            raise serializers.ValidationError(errors)
         
         return attrs
 
