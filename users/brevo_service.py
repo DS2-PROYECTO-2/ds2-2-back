@@ -56,7 +56,13 @@ def send_email_via_brevo(to, subject, html_content, text_content=None):
         response = requests.post(BREVO_API_URL, json=payload, headers=headers)
 
         print(f"[BREVO_DEBUG] Status Code: {response.status_code}")
+        print(f"[BREVO_DEBUG] Response Headers: {dict(response.headers)}")
         print(f"[BREVO_DEBUG] Response: {response.text}")
+        
+        if response.status_code != 201:
+            print(f"[BREVO_ERROR] Error en Brevo API - Status: {response.status_code}")
+            print(f"[BREVO_ERROR] Response: {response.text}")
+            raise Exception(f"Brevo API error: {response.status_code} - {response.text}")
 
         response.raise_for_status()
         return response.json()
