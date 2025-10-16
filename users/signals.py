@@ -113,41 +113,20 @@ def notify_admin_new_user_registration(sender, instance, created, **kwargs):
                 print(f"[EMAIL_DEBUG] BREVO_API_KEY: {'***' if getattr(settings, 'BREVO_API_KEY', None) else 'No configurado'}")
                 print(f"[EMAIL_DEBUG] DEFAULT_FROM_EMAIL: {getattr(settings, 'DEFAULT_FROM_EMAIL', 'No configurado')}")
                 
-                # Verificar si hay API key de Brevo configurada
-                brevo_api_key = getattr(settings, 'BREVO_API_KEY', None)
-                if not brevo_api_key:
-                    print(f"[EMAIL_ERROR] BREVO_API_KEY no está configurado")
-                    raise Exception("BREVO_API_KEY no está configurado en las settings")
-                
-                # En modo testing, usar fallback a locmem
-                if brevo_api_key == 'test-key':
-                    print(f"[EMAIL_DEBUG] Modo testing detectado - usando locmem backend")
-                    from django.core.mail import send_mail
-                    result = send_mail(
-                        subject=subject,
-                        message=texto,
-                        from_email=settings.DEFAULT_FROM_EMAIL,
-                        recipient_list=admin_emails,
-                        html_message=html,
-                        fail_silently=False,
-                    )
-                    print(f"[EMAIL_SUCCESS] Correo enviado via locmem a {len(admin_emails)} admins")
-                    return
-                
+                # Usar función unificada para envío de emails
                 print(f"[EMAIL_DEBUG] ========== ENVIANDO EMAIL ==========")
-                print(f"[EMAIL_DEBUG] Usando Brevo API...")
                 print(f"[EMAIL_DEBUG] Enviando a {admin_emails[0]}")
                 
-                result = send_email_via_brevo(
+                result = send_email_unified(
                     to=admin_emails[0],
                     subject=subject,
-                    html_content=html,
-                    text_content=texto
+                    text_content=texto,
+                    html_content=html
                 )
                 
-                print(f"[EMAIL_DEBUG] ========== RESULTADO BREVO ==========")
-                print(f"[EMAIL_DEBUG] Resultado Brevo: {result}")
-                print(f"[EMAIL_SUCCESS] Correo enviado via Brevo API a {len(admin_emails)} admins")
+                print(f"[EMAIL_DEBUG] ========== RESULTADO ==========")
+                print(f"[EMAIL_DEBUG] Resultado: {result}")
+                print(f"[EMAIL_SUCCESS] Correo enviado a {len(admin_emails)} admins")
                 print(f"[EMAIL_DEBUG] ========== EMAIL ENVIADO EXITOSAMENTE ==========")
                 
             except Exception as e:

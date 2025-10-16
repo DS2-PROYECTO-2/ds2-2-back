@@ -32,12 +32,20 @@ CORS_ALLOWED_ORIGINS = [
 
 CORS_ALLOW_CREDENTIALS = True
 
-# Email para desarrollo - Usar Console Backend (para desarrollo local)
-EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+# Email para desarrollo - Gmail SMTP
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = 'smtp.gmail.com'
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+EMAIL_USE_SSL = False
+EMAIL_HOST_USER = env('EMAIL_HOST_USER', default='sado56hdgm@gmail.com')
+EMAIL_HOST_PASSWORD = env('EMAIL_HOST_PASSWORD', default='orfl vkzn dern pbos')
 DEFAULT_FROM_EMAIL = env('DEFAULT_FROM_EMAIL', default='Soporte DS2 <sado56hdgm@gmail.com>')
+EMAIL_TIMEOUT = 20
+EMAIL_FAIL_SILENTLY = False
 
-# Brevo API Key para desarrollo (opcional)
-BREVO_API_KEY = env('BREVO_API_KEY', default='test-key')
+# Brevo API Key para desarrollo (opcional, para testing)
+BREVO_API_KEY = env('BREVO_API_KEY', default='')
 
 # URLs para desarrollo
 PUBLIC_BASE_URL = "http://localhost:8000"
