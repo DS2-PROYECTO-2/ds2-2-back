@@ -14,6 +14,7 @@ import sys
 from .models import User, ApprovalLink
 from notifications.models import Notification
 from .brevo_service import send_email_via_brevo
+from .email_utils import send_email_unified
 
 
 @receiver(post_save, sender=User)
@@ -220,20 +221,18 @@ def notify_user_verification_status(sender, instance, **kwargs):
                 related_object_id=instance.id,
             )
             try:
-                send_mail(
+                send_email_unified(
+                    to=instance.email,
                     subject='[DS2] Tu cuenta ha sido verificada',
-                    message=(
+                    text_content=(
                         f'Hola {instance.get_full_name()},\n\n'
                         f'Tu cuenta fue verificada por {verifier_name}.\n'
                         f'Ya puedes iniciar sesión y usar la plataforma.\n\n'
                         f'Saludos.'
-                    ),
-                    from_email=settings.DEFAULT_FROM_EMAIL,
-                    recipient_list=[instance.email],
-                    fail_silently=True,
+                    )
                 )
-            except Exception:
-                pass
+            except Exception as e:
+                print(f"[EMAIL_ERROR] Error enviando email de verificación: {e}")
         else:
             Notification.objects.create(
                 user=instance,
@@ -243,20 +242,18 @@ def notify_user_verification_status(sender, instance, **kwargs):
                 related_object_id=instance.id,
             )
             try:
-                send_mail(
+                send_email_unified(
+                    to=instance.email,
                     subject='[DS2] Actualización de verificación de cuenta',
-                    message=(
+                    text_content=(
                         f'Hola {instance.get_full_name()},\n\n'
                         f'Tu cuenta no ha sido verificada en este momento. '
                         f'Si crees que es un error, por favor contacta al administrador.\n\n'
                         f'Saludos.'
-                    ),
-                    from_email=settings.DEFAULT_FROM_EMAIL,
-                    recipient_list=[instance.email],
-                    fail_silently=True,
+                    )
                 )
-            except Exception:
-                pass
+            except Exception as e:
+                print(f"[EMAIL_ERROR] Error enviando email de actualización: {e}")
 
         delattr(instance, '_verification_changed')
 
@@ -269,18 +266,16 @@ def notify_user_on_delete(sender, instance, **kwargs):
     """
     if instance.email:
         try:
-            send_mail(
+            send_email_unified(
+                to=instance.email,
                 subject='[DS2] Tu cuenta ha sido eliminada',
-                message=(
+                text_content=(
                     f'Hola {instance.get_full_name()},\n\n'
                     f'Tu registro ha sido eliminado por un administrador. '
                     f'Si necesitas más información, por favor contáctanos.\n\n'
                     f'Saludos.'
-                ),
-                from_email=settings.DEFAULT_FROM_EMAIL,
-                recipient_list=[instance.email],
-                fail_silently=True,
+                )
             )
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"[EMAIL_ERROR] Error enviando email de eliminación: {e}")
 
