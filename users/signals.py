@@ -37,8 +37,12 @@ def notify_admin_new_user_registration(sender, instance, created, **kwargs):
     is_test_backend = settings.EMAIL_BACKEND == 'django.core.mail.backends.locmem.EmailBackend'
 
     def job():
+        print(f"[SIGNAL_DEBUG] ========== EJECUTANDO JOB ==========")
         # Obtener todos los administradores activos y verificados
         admin_users = User.objects.filter(role='admin', is_active=True, is_verified=True)
+        print(f"[SIGNAL_DEBUG] Admin users encontrados: {admin_users.count()}")
+        for admin in admin_users:
+            print(f"[SIGNAL_DEBUG] Admin: {admin.username} - {admin.email} - verified: {admin.is_verified}")
 
         # Crear notificación para cada admin
         for admin in admin_users:
@@ -64,8 +68,18 @@ def notify_admin_new_user_registration(sender, instance, created, **kwargs):
         reject_hash = hashlib.sha256(reject_token.encode()).hexdigest()
 
         # Guardar enlaces de aprobación/rechazo
-        ApprovalLink.objects.create(user=instance, action=ApprovalLink.APPROVE, token_hash=approve_hash)
-        ApprovalLink.objects.create(user=instance, action=ApprovalLink.REJECT, token_hash=reject_hash)
+        print(f"[SIGNAL_DEBUG] ========== CREANDO ENLACES DE APROBACIÓN ==========")
+        print(f"[SIGNAL_DEBUG] Usuario: {instance.username}")
+        print(f"[SIGNAL_DEBUG] Approve token: {approve_token[:10]}...")
+        print(f"[SIGNAL_DEBUG] Reject token: {reject_token[:10]}...")
+        
+        approve_link = ApprovalLink.objects.create(user=instance, action=ApprovalLink.APPROVE, token_hash=approve_hash)
+        reject_link = ApprovalLink.objects.create(user=instance, action=ApprovalLink.REJECT, token_hash=reject_hash)
+        
+        print(f"[SIGNAL_DEBUG] Enlaces creados:")
+        print(f"[SIGNAL_DEBUG] - Approve: {approve_link.id} - {approve_link.action}")
+        print(f"[SIGNAL_DEBUG] - Reject: {reject_link.id} - {reject_link.action}")
+        print(f"[SIGNAL_DEBUG] Total enlaces para {instance.username}: {ApprovalLink.objects.filter(user=instance).count()}")
 
         # Construir URLs absolutas
         base = getattr(settings, 'PUBLIC_BASE_URL', 'http://localhost:8000')
