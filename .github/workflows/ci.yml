@@ -40,12 +40,13 @@ jobs:
         DJANGO_ENV: testing
         SECRET_KEY: test-secret-key
         DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_db
-        BREVO_API_KEY: ${{ secrets.BREVO_API_KEY || 'test_brevo_key' }}
+        BREVO_API_KEY: ${{ secrets.BREVO_API_KEY || 'test_brevo_key_for_testing' }}
         DEFAULT_FROM_EMAIL: "Test <test@example.com>"
         ALLOWED_HOSTS: "localhost,127.0.0.1"
         CORS_ALLOWED_ORIGINS: "http://localhost:3000"
         CSRF_TRUSTED_ORIGINS: "http://localhost:8000"
         PUBLIC_BASE_URL: "http://localhost:8000"
         FRONTEND_BASE_URL: "http://localhost:3000"
+        TESTING: "true"
       run: |
         python manage.py test --verbosity=1

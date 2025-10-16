@@ -56,11 +56,22 @@ def send_email_via_brevo(to, subject, html_content, text_content=None):
         print(f"[BREVO_DEBUG] Headers: {headers}")
         print(f"[BREVO_DEBUG] Payload: {payload}")
 
-        response = requests.post(BREVO_API_URL, json=payload, headers=headers)
+        response = requests.post(BREVO_API_URL, json=payload, headers=headers, timeout=30)
 
         print(f"[BREVO_DEBUG] Status Code: {response.status_code}")
         print(f"[BREVO_DEBUG] Response: {response.text}")
 
+        if response.status_code == 401:
+            print(f"[BREVO_ERROR] ❌ API key inválida o expirada")
+            print(f"[BREVO_ERROR] Verifica que BREVO_API_KEY esté configurada correctamente")
+            raise Exception(f"Brevo API: API key inválida o expirada (401)")
+        elif response.status_code == 403:
+            print(f"[BREVO_ERROR] ❌ Acceso denegado - verifica permisos de la API key")
+            raise Exception(f"Brevo API: Acceso denegado (403)")
+        elif response.status_code == 429:
+            print(f"[BREVO_ERROR] ❌ Límite de rate limit excedido")
+            raise Exception(f"Brevo API: Rate limit excedido (429)")
+        
         response.raise_for_status()
         return response.json()
     except requests.exceptions.RequestException as e:
