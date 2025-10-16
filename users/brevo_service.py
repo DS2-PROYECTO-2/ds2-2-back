@@ -18,16 +18,9 @@ def send_email_via_brevo(to, subject, html_content, text_content=None):
         "content-type": "application/json"
     }
 
-    # Extraer email del DEFAULT_FROM_EMAIL
-    from_email = settings.DEFAULT_FROM_EMAIL
-    if '<' in from_email and '>' in from_email:
-        # Formato: "Nombre <email@domain.com>"
-        from_email_clean = from_email.split('<')[1].split('>')[0].strip()
-        from_name = from_email.split('<')[0].strip()
-    else:
-        # Formato: "email@domain.com"
-        from_email_clean = from_email
-        from_name = "Soporte DS2"
+    # Usar sender autorizado en Brevo
+    from_email_clean = "prospectiva207@gmail.com"  # Sender autorizado en Brevo
+    from_name = "Soporte DS2"
 
     payload = {
         "sender": {
