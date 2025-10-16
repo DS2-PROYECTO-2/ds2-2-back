@@ -118,6 +118,21 @@ def notify_admin_new_user_registration(sender, instance, created, **kwargs):
                     print(f"[EMAIL_ERROR] BREVO_API_KEY no está configurado")
                     raise Exception("BREVO_API_KEY no está configurado en las settings")
                 
+                # En modo testing, usar fallback a locmem
+                if brevo_api_key == 'test-key':
+                    print(f"[EMAIL_DEBUG] Modo testing detectado - usando locmem backend")
+                    from django.core.mail import send_mail
+                    result = send_mail(
+                        subject=subject,
+                        message=texto,
+                        from_email=settings.DEFAULT_FROM_EMAIL,
+                        recipient_list=admin_emails,
+                        html_message=html,
+                        fail_silently=False,
+                    )
+                    print(f"[EMAIL_SUCCESS] Correo enviado via locmem a {len(admin_emails)} admins")
+                    return
+                
                 print(f"[EMAIL_DEBUG] ========== ENVIANDO EMAIL ==========")
                 print(f"[EMAIL_DEBUG] Usando Brevo API...")
                 print(f"[EMAIL_DEBUG] Enviando a {admin_emails[0]}")

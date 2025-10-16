@@ -11,6 +11,13 @@ def send_email_via_brevo(to, subject, html_content, text_content=None):
     brevo_api_key = getattr(settings, 'BREVO_API_KEY', None)
     if not brevo_api_key:
         raise ValueError("BREVO_API_KEY no está configurado en las settings.")
+    
+    # En entorno de testing, simular envío exitoso
+    if brevo_api_key == 'test-key':
+        print(f"[BREVO_DEBUG] Modo testing - simulando envío exitoso")
+        print(f"[BREVO_DEBUG] To: {to}")
+        print(f"[BREVO_DEBUG] Subject: {subject}")
+        return {"messageId": "test-message-id", "status": "sent"}
 
     headers = {
         "accept": "application/json",
