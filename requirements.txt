@@ -38,8 +38,8 @@ gunicorn==21.2.0  # WSGI server
 whitenoise==6.6.0  # Static files serving
 
 # Email
-django-anymail==10.2  # Email backend
-requests==2.31.0  # Para Resend API HTTP
+django-anymail==10.2  # Email backend para Brevo
+requests
 
 # Validation & Forms
 django-crispy-forms==2.1  # Better forms
