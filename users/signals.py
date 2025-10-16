@@ -112,6 +112,38 @@ def _send():
         print(f"[BREVO_DEBUG] BREVO_API_KEY: {'***' if getattr(settings, 'ANYMAIL', {}).get('BREVO_API_KEY') else 'No configurado'}")
         print(f"[BREVO_DEBUG] DEFAULT_FROM_EMAIL: {settings.DEFAULT_FROM_EMAIL}")
         
+        # Verificar variables de entorno
+        print(f"[BREVO_DEBUG] ========== VARIABLES DE ENTORNO ==========")
+        import os
+        print(f"[BREVO_DEBUG] DJANGO_ENV: {os.getenv('DJANGO_ENV', 'No configurado')}")
+        print(f"[BREVO_DEBUG] BREVO_API_KEY env: {'***' if os.getenv('BREVO_API_KEY') else 'No configurado'}")
+        print(f"[BREVO_DEBUG] DEFAULT_FROM_EMAIL env: {os.getenv('DEFAULT_FROM_EMAIL', 'No configurado')}")
+        
+        # Verificar configuración de Anymail
+        print(f"[BREVO_DEBUG] ========== CONFIGURACIÓN ANYMAIL ==========")
+        anymail_config = getattr(settings, 'ANYMAIL', {})
+        print(f"[BREVO_DEBUG] ANYMAIL config: {anymail_config}")
+        print(f"[BREVO_DEBUG] ANYMAIL BREVO_API_KEY: {'***' if anymail_config.get('BREVO_API_KEY') else 'No configurado'}")
+        
+        # Verificar que Anymail esté instalado
+        print(f"[BREVO_DEBUG] ========== VERIFICACIÓN ANYMAIL ==========")
+        try:
+            import anymail
+            print(f"[BREVO_DEBUG] Anymail version: {anymail.__version__}")
+            print(f"[BREVO_DEBUG] Anymail backends disponibles: {anymail.backends.__all__}")
+        except ImportError as import_error:
+            print(f"[BREVO_ERROR] Anymail no está instalado: {import_error}")
+            raise
+        
+        # Verificar backend específico
+        print(f"[BREVO_DEBUG] ========== VERIFICACIÓN BACKEND ==========")
+        try:
+            from anymail.backends.brevo import EmailBackend
+            print(f"[BREVO_DEBUG] Brevo EmailBackend importado correctamente")
+        except ImportError as backend_error:
+            print(f"[BREVO_ERROR] Error importando Brevo backend: {backend_error}")
+            raise
+        
         # Usar send_mail con Brevo
         print(f"[BREVO_DEBUG] ========== ENVIANDO EMAIL VIA BREVO ==========")
         print(f"[BREVO_DEBUG] Usando Brevo API...")
@@ -120,7 +152,18 @@ def _send():
         print(f"[BREVO_DEBUG]   - from_email: {settings.DEFAULT_FROM_EMAIL}")
         print(f"[BREVO_DEBUG]   - recipient_list: {admin_emails}")
         print(f"[BREVO_DEBUG]   - html_message length: {len(html)}")
+        print(f"[BREVO_DEBUG]   - fail_silently: False")
         
+        # Log del contenido del email
+        print(f"[BREVO_DEBUG] ========== CONTENIDO DEL EMAIL ==========")
+        print(f"[BREVO_DEBUG] Subject: {subject}")
+        print(f"[BREVO_DEBUG] From: {settings.DEFAULT_FROM_EMAIL}")
+        print(f"[BREVO_DEBUG] To: {admin_emails}")
+        print(f"[BREVO_DEBUG] Text preview: {texto[:100]}...")
+        print(f"[BREVO_DEBUG] HTML preview: {html[:200]}...")
+        
+        # Intentar envío
+        print(f"[BREVO_DEBUG] ========== EJECUTANDO SEND_MAIL ==========")
         result = send_mail(
             subject=subject,
             message=texto,
@@ -145,12 +188,8 @@ def _send():
         print(f"[BREVO_ERROR] Módulo del error: {type(e).__module__}")
         print(f"[BREVO_ERROR] Args del error: {e.args}")
         
-        import traceback
-        print(f"[BREVO_ERROR] ========== TRACEBACK COMPLETO ==========")
-        print(f"[BREVO_ERROR] {traceback.format_exc()}")
-        print(f"[BREVO_ERROR] ========== FIN DEL ERROR ==========")
-        
-        # Intentar información adicional del error
+        # Información adicional del error
+        print(f"[BREVO_ERROR] ========== INFORMACIÓN ADICIONAL DEL ERROR ==========")
         try:
             if hasattr(e, 'errno'):
                 print(f"[BREVO_ERROR] Error number: {e.errno}")
@@ -158,8 +197,31 @@ def _send():
                 print(f"[BREVO_ERROR] Error string: {e.strerror}")
             if hasattr(e, 'filename'):
                 print(f"[BREVO_ERROR] Error filename: {e.filename}")
+            if hasattr(e, 'response'):
+                print(f"[BREVO_ERROR] HTTP Response: {e.response}")
+            if hasattr(e, 'status_code'):
+                print(f"[BREVO_ERROR] HTTP Status Code: {e.status_code}")
         except Exception as debug_error:
             print(f"[BREVO_ERROR] Error obteniendo info adicional: {debug_error}")
+        
+        # Traceback completo
+        import traceback
+        print(f"[BREVO_ERROR] ========== TRACEBACK COMPLETO ==========")
+        print(f"[BREVO_ERROR] {traceback.format_exc()}")
+        print(f"[BREVO_ERROR] ========== FIN DEL ERROR ==========")
+        
+        # Información del sistema
+        print(f"[BREVO_ERROR] ========== INFORMACIÓN DEL SISTEMA ==========")
+        try:
+            import sys
+            print(f"[BREVO_ERROR] Python version: {sys.version}")
+            print(f"[BREVO_ERROR] Django version: {__import__('django').get_version()}")
+            print(f"[BREVO_ERROR] Anymail version: {__import__('anymail').__version__}")
+        except Exception as sys_error:
+            print(f"[BREVO_ERROR] Error obteniendo info del sistema: {sys_error}")
+        
+        # Re-raise para que el error se propague
+        raise
 
         # En tests, ejecutar sincrónicamente para que mail.outbox funcione
         # En producción, usar hilo asíncrono para no bloquear
