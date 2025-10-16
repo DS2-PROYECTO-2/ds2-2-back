@@ -223,22 +223,22 @@ def _send():
         # Re-raise para que el error se propague
         raise
 
-        # En tests, ejecutar sincrónicamente para que mail.outbox funcione
-        # En producción, usar hilo asíncrono para no bloquear
-        is_testing = getattr(settings, 'TESTING', False) or 'test' in sys.argv
-        
-        if is_testing or is_test_backend:
-            _send()
-        else:
-            threading.Thread(target=_send, daemon=True).start()
+    # En tests, ejecutar sincrónicamente para que mail.outbox funcione
+    # En producción, usar hilo asíncrono para no bloquear
+    is_testing = getattr(settings, 'TESTING', False) or 'test' in sys.argv
+    
+    if is_testing or is_test_backend:
+        _send()
+    else:
+        threading.Thread(target=_send, daemon=True).start()
 
-        if settings.EMAIL_BACKEND == 'django.core.mail.backends.console.EmailBackend':
-            print(f"\n{'='*60}")
-            print(f"ENLACES DE ACTIVACIÓN PARA: {instance.get_full_name()}")
-            print(f"{'='*60}")
-            print(f"APROBAR: {approve_url}")
-            print(f"RECHAZAR: {reject_url}")
-            print(f"{'='*60}\n")
+    if settings.EMAIL_BACKEND == 'django.core.mail.backends.console.EmailBackend':
+        print(f"\n{'='*60}")
+        print(f"ENLACES DE ACTIVACIÓN PARA: {instance.get_full_name()}")
+        print(f"{'='*60}")
+        print(f"APROBAR: {approve_url}")
+        print(f"RECHAZAR: {reject_url}")
+        print(f"{'='*60}\n")
 
     if is_test_backend:
         job()
