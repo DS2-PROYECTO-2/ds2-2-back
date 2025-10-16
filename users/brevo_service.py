@@ -19,7 +19,7 @@ def send_email_via_brevo(to, subject, html_content, text_content=None):
     }
 
     # Usar sender autorizado en Brevo
-    from_email_clean = "prospectiva207@gmail.com"  # Sender autorizado en Brevo
+    from_email_clean = "sado56hdgm@gmail.com"  # Sender autorizado en Brevo
     from_name = "Soporte DS2"
 
     payload = {
