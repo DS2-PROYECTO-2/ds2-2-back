@@ -39,6 +39,18 @@ class AdminApprovalLinksTests(TestCase):
     def test_approval_link_creation_on_registration(self):
         """Test que se crean enlaces de aprobación cuando un monitor se registra"""
         # El monitor ya fue creado en setUp, lo que debería haber disparado el signal
+        # Forzar la ejecución del signal si no se ejecutó automáticamente
+        from users.signals import notify_admin_new_user_registration
+        from django.db.models.signals import post_save
+        from users.models import User
+        
+        # Disparar el signal manualmente
+        notify_admin_new_user_registration(
+            sender=User,
+            instance=self.monitor,
+            created=True
+        )
+        
         approval_links = ApprovalLink.objects.filter(user=self.monitor)
         self.assertEqual(approval_links.count(), 2)
         

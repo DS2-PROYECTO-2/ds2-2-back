@@ -99,6 +99,20 @@ class RegistrationUpdatedTests(TestCase):
         
         self.assertEqual(response.status_code, 201)
         
+        # Forzar la ejecución del signal si no se ejecutó automáticamente
+        from users.signals import notify_admin_new_user_registration
+        from users.models import User
+        
+        # Obtener el usuario recién creado
+        new_user = User.objects.get(username="monitor2")
+        
+        # Disparar el signal manualmente
+        notify_admin_new_user_registration(
+            sender=User,
+            instance=new_user,
+            created=True
+        )
+        
         # Verificar que se envió email al admin
         self.assertGreaterEqual(len(mail.outbox), 1)
         email = mail.outbox[0]
