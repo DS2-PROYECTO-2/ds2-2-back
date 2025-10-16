@@ -24,7 +24,6 @@ INSTALLED_APPS = [
     'rest_framework',
     'rest_framework.authtoken',
     'corsheaders',
-    'anymail',
     
     # Local apps (Sprint 1)
     'users.apps.UsersConfig',

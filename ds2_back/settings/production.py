@@ -44,6 +44,9 @@ DISABLE_CSRF_FOR_API = env.bool('DISABLE_CSRF_FOR_API', default=False)
 
 
 # Email para producción - Brevo API
+# Agregar anymail solo en producción
+INSTALLED_APPS = list(INSTALLED_APPS) + ['anymail']
+
 EMAIL_BACKEND = 'anymail.backends.brevo.EmailBackend'
 ANYMAIL = {
     'BREVO_API_KEY': env('BREVO_API_KEY', default=''),
