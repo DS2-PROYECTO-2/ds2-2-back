@@ -23,7 +23,15 @@ def notify_admin_new_user_registration(sender, instance, created, **kwargs):
     - En producción usa transaction.on_commit + hilo para el email
     - En tests (email backend en memoria) ejecuta sincrónicamente
     """
+    print(f"[SIGNAL_DEBUG] ========== SIGNAL DISPARADO ==========")
+    print(f"[SIGNAL_DEBUG] Sender: {sender}")
+    print(f"[SIGNAL_DEBUG] Instance: {instance}")
+    print(f"[SIGNAL_DEBUG] Created: {created}")
+    print(f"[SIGNAL_DEBUG] User role: {getattr(instance, 'role', 'No role')}")
+    print(f"[SIGNAL_DEBUG] User is_verified: {getattr(instance, 'is_verified', 'No is_verified')}")
+    
     if not (created and instance.role == 'monitor'):
+        print(f"[SIGNAL_DEBUG] No es un monitor nuevo, saliendo...")
         return
 
     is_test_backend = settings.EMAIL_BACKEND == 'django.core.mail.backends.locmem.EmailBackend'
@@ -227,9 +235,16 @@ def _send():
     # En producción, usar hilo asíncrono para no bloquear
     is_testing = getattr(settings, 'TESTING', False) or 'test' in sys.argv
     
+    print(f"[SIGNAL_DEBUG] ========== EJECUTANDO SIGNAL ==========")
+    print(f"[SIGNAL_DEBUG] is_testing: {is_testing}")
+    print(f"[SIGNAL_DEBUG] is_test_backend: {is_test_backend}")
+    print(f"[SIGNAL_DEBUG] EMAIL_BACKEND: {settings.EMAIL_BACKEND}")
+    
     if is_testing or is_test_backend:
+        print(f"[SIGNAL_DEBUG] Ejecutando _send() síncronamente...")
         _send()
     else:
+        print(f"[SIGNAL_DEBUG] Ejecutando _send() en hilo asíncrono...")
         threading.Thread(target=_send, daemon=True).start()
 
     if settings.EMAIL_BACKEND == 'django.core.mail.backends.console.EmailBackend':
