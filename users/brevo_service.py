@@ -10,10 +10,6 @@ def send_email_via_brevo(to, subject, html_content, text_content=None):
     """
     brevo_api_key = getattr(settings, 'BREVO_API_KEY', None)
     if not brevo_api_key:
-        # En modo testing, simular envío exitoso
-        if getattr(settings, 'TESTING', False) or 'test' in __import__('sys').argv:
-            print(f"[BREVO_TEST] Simulando envío a {to}: {subject}")
-            return {"messageId": "test_message_id", "status": "sent"}
         raise ValueError("BREVO_API_KEY no está configurado en las settings.")
 
     headers = {
@@ -22,20 +18,21 @@ def send_email_via_brevo(to, subject, html_content, text_content=None):
         "content-type": "application/json"
     }
 
-    # Extraer email del from_email si tiene formato "Name <email>"
+    # Extraer email del DEFAULT_FROM_EMAIL
     from_email = settings.DEFAULT_FROM_EMAIL
     if '<' in from_email and '>' in from_email:
-        from_email = from_email.split('<')[-1].strip('>')
-    
-    # Extraer nombre del from_email si tiene formato "Name <email>"
-    from_name = "Soporte DS2"
-    if '<' in settings.DEFAULT_FROM_EMAIL and '>' in settings.DEFAULT_FROM_EMAIL:
-        from_name = settings.DEFAULT_FROM_EMAIL.split('<')[0].strip()
+        # Formato: "Nombre <email@domain.com>"
+        from_email_clean = from_email.split('<')[1].split('>')[0].strip()
+        from_name = from_email.split('<')[0].strip()
+    else:
+        # Formato: "email@domain.com"
+        from_email_clean = from_email
+        from_name = "Soporte DS2"
 
     payload = {
         "sender": {
             "name": from_name,
-            "email": from_email
+            "email": from_email_clean
         },
         "to": [
             {
@@ -56,22 +53,11 @@ def send_email_via_brevo(to, subject, html_content, text_content=None):
         print(f"[BREVO_DEBUG] Headers: {headers}")
         print(f"[BREVO_DEBUG] Payload: {payload}")
 
-        response = requests.post(BREVO_API_URL, json=payload, headers=headers, timeout=30)
+        response = requests.post(BREVO_API_URL, json=payload, headers=headers)
 
         print(f"[BREVO_DEBUG] Status Code: {response.status_code}")
         print(f"[BREVO_DEBUG] Response: {response.text}")
 
-        if response.status_code == 401:
-            print(f"[BREVO_ERROR] ❌ API key inválida o expirada")
-            print(f"[BREVO_ERROR] Verifica que BREVO_API_KEY esté configurada correctamente")
-            raise Exception(f"Brevo API: API key inválida o expirada (401)")
-        elif response.status_code == 403:
-            print(f"[BREVO_ERROR] ❌ Acceso denegado - verifica permisos de la API key")
-            raise Exception(f"Brevo API: Acceso denegado (403)")
-        elif response.status_code == 429:
-            print(f"[BREVO_ERROR] ❌ Límite de rate limit excedido")
-            raise Exception(f"Brevo API: Rate limit excedido (429)")
-        
         response.raise_for_status()
         return response.json()
     except requests.exceptions.RequestException as e:

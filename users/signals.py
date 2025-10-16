@@ -110,31 +110,73 @@ def notify_admin_new_user_registration(sender, instance, created, **kwargs):
                 # Verificar configuración de email
                 print(f"[EMAIL_DEBUG] ========== CONFIGURACIÓN DE EMAIL ==========")
                 print(f"[EMAIL_DEBUG] EMAIL_BACKEND: {getattr(settings, 'EMAIL_BACKEND', 'No configurado')}")
-                print(f"[EMAIL_DEBUG] BREVO_API_KEY: {'***' if getattr(settings, 'BREVO_API_KEY', None) else 'No configurado'}")
-                print(f"[EMAIL_DEBUG] DEFAULT_FROM_EMAIL: {getattr(settings, 'DEFAULT_FROM_EMAIL', 'No configurado')}")
+                print(f"[EMAIL_DEBUG] EMAIL_HOST: {getattr(settings, 'EMAIL_HOST', 'No configurado')}")
+                print(f"[EMAIL_DEBUG] EMAIL_PORT: {getattr(settings, 'EMAIL_PORT', 'No configurado')}")
+                print(f"[EMAIL_DEBUG] EMAIL_USE_TLS: {getattr(settings, 'EMAIL_USE_TLS', 'No configurado')}")
+                print(f"[EMAIL_DEBUG] EMAIL_USE_SSL: {getattr(settings, 'EMAIL_USE_SSL', 'No configurado')}")
+                print(f"[EMAIL_DEBUG] EMAIL_HOST_USER: {getattr(settings, 'EMAIL_HOST_USER', 'No configurado')}")
+                print(f"[EMAIL_DEBUG] EMAIL_HOST_PASSWORD: {'***' if getattr(settings, 'EMAIL_HOST_PASSWORD', None) else 'No configurado'}")
+                print(f"[EMAIL_DEBUG] EMAIL_TIMEOUT: {getattr(settings, 'EMAIL_TIMEOUT', 'No configurado')}")
+                print(f"[EMAIL_DEBUG] EMAIL_FAIL_SILENTLY: {getattr(settings, 'EMAIL_FAIL_SILENTLY', 'No configurado')}")
                 
                 # Verificar variables de entorno
                 print(f"[EMAIL_DEBUG] ========== VARIABLES DE ENTORNO ==========")
                 import os
                 print(f"[EMAIL_DEBUG] DJANGO_ENV: {os.getenv('DJANGO_ENV', 'No configurado')}")
-                print(f"[EMAIL_DEBUG] BREVO_API_KEY env: {'***' if os.getenv('BREVO_API_KEY') else 'No configurado'}")
+                print(f"[EMAIL_DEBUG] EMAIL_BACKEND env: {os.getenv('EMAIL_BACKEND', 'No configurado')}")
+                print(f"[EMAIL_DEBUG] EMAIL_HOST env: {os.getenv('EMAIL_HOST', 'No configurado')}")
+                print(f"[EMAIL_DEBUG] EMAIL_PORT env: {os.getenv('EMAIL_PORT', 'No configurado')}")
+                print(f"[EMAIL_DEBUG] EMAIL_USE_TLS env: {os.getenv('EMAIL_USE_TLS', 'No configurado')}")
+                print(f"[EMAIL_DEBUG] EMAIL_HOST_USER env: {os.getenv('EMAIL_HOST_USER', 'No configurado')}")
+                print(f"[EMAIL_DEBUG] EMAIL_HOST_PASSWORD env: {'***' if os.getenv('EMAIL_HOST_PASSWORD') else 'No configurado'}")
                 
-                # Usar Brevo API
+                # Verificar si hay API key de Brevo configurada
+                brevo_api_key = getattr(settings, 'BREVO_API_KEY', None)
+                if brevo_api_key:
+                    print(f"[EMAIL_DEBUG] ========== ENVIANDO EMAIL ==========")
+                    print(f"[EMAIL_DEBUG] Usando Brevo API...")
+                    print(f"[EMAIL_DEBUG] Enviando a {admin_emails[0]}")
+                    
+                    try:
+                        result = send_email_via_brevo(
+                            to=admin_emails[0],
+                            subject=subject,
+                            html_content=html,
+                            text_content=texto
+                        )
+                        print(f"[EMAIL_DEBUG] ========== RESULTADO BREVO ==========")
+                        print(f"[EMAIL_DEBUG] Resultado Brevo: {result}")
+                        print(f"[EMAIL_SUCCESS] Correo enviado via Brevo API a {len(admin_emails)} admins")
+                        print(f"[EMAIL_DEBUG] ========== EMAIL ENVIADO EXITOSAMENTE ==========")
+                        return
+                    except Exception as e:
+                        print(f"[EMAIL_ERROR] Error con Brevo API: {e}")
+                        # Continuar con send_mail como fallback
+                        pass
+                
+                # Usar send_mail tradicional (Gmail SMTP) como fallback
                 print(f"[EMAIL_DEBUG] ========== ENVIANDO EMAIL ==========")
-                print(f"[EMAIL_DEBUG] Usando Brevo API...")
+                print(f"[EMAIL_DEBUG] Usando Gmail SMTP...")
+                print(f"[EMAIL_DEBUG] Preparando send_mail con:")
+                print(f"[EMAIL_DEBUG]   - subject: {subject}")
+                print(f"[EMAIL_DEBUG]   - from_email: {settings.DEFAULT_FROM_EMAIL}")
+                print(f"[EMAIL_DEBUG]   - recipient_list: {admin_emails}")
+                print(f"[EMAIL_DEBUG]   - html_message length: {len(html)}")
+                print(f"[EMAIL_DEBUG]   - fail_silently: False")
                 
-                # Enviar a cada admin por separado
-                for admin_email in admin_emails:
-                    print(f"[EMAIL_DEBUG] Enviando a {admin_email}...")
-                    result = send_email_via_brevo(
-                        to=admin_email,
-                        subject=subject,
-                        html_content=html,
-                        text_content=texto
-                    )
-                    print(f"[EMAIL_DEBUG] Resultado Brevo para {admin_email}: {result}")
+                result = send_mail(
+                    subject=subject,
+                    message=texto,
+                    from_email=settings.DEFAULT_FROM_EMAIL,
+                    recipient_list=admin_emails,
+                    html_message=html,
+                    fail_silently=False,
+                )
                 
-                print(f"[EMAIL_SUCCESS] Correo enviado via Brevo API a {len(admin_emails)} admins")
+                print(f"[EMAIL_DEBUG] ========== RESULTADO SEND_MAIL ==========")
+                print(f"[EMAIL_DEBUG] Resultado send_mail: {result}")
+                print(f"[EMAIL_DEBUG] Tipo de resultado: {type(result)}")
+                print(f"[EMAIL_SUCCESS] Correo enviado via Gmail SMTP a {len(admin_emails)} admins")
                 print(f"[EMAIL_DEBUG] ========== EMAIL ENVIADO EXITOSAMENTE ==========")
                 
             except Exception as e:

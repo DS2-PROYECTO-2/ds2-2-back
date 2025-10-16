@@ -55,7 +55,7 @@ DEFAULT_FROM_EMAIL = env('DEFAULT_FROM_EMAIL')
 EMAIL_TIMEOUT = env.int('EMAIL_TIMEOUT', default=20)
 EMAIL_FAIL_SILENTLY = env.bool('EMAIL_FAIL_SILENTLY', default=True)
 
-# Brevo API Key
+# Brevo API Key (opcional)
 BREVO_API_KEY = env('BREVO_API_KEY', default='')
 
 # URLs para producción
