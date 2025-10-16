@@ -20,9 +20,6 @@ ALLOWED_HOSTS = ['testserver', 'localhost', '127.0.0.1']
 # Email backend para tests
 EMAIL_BACKEND = 'django.core.mail.backends.locmem.EmailBackend'
 
-# Configuración para signals en testing
-TESTING = True
-
 # URLs para tests
 PUBLIC_BASE_URL = "http://testserver"
 FRONTEND_BASE_URL = "http://testserver"

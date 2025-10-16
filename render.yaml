@@ -25,10 +25,10 @@ services:
         value: "https://backendpruebas-r4zu.onrender.com"
       - key: FRONTEND_BASE_URL
         value: "https://ds2-2-front.vercel.app"
-        - key: BREVO_API_KEY
-          sync: false
-        - key: DEFAULT_FROM_EMAIL
-          value: "Soporte DS2 <sado56hdgm@gmail.com>"
+      - key: BREVO_API_KEY
+        value: "CONFIGURAR_EN_RENDER_DASHBOARD"
+      - key: DEFAULT_FROM_EMAIL
+        value: "Soporte DS2 <noreply@ds2.com>"
 
 databases:
   - name: ds2-database

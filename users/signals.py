@@ -13,6 +13,7 @@ import sys
 
 from .models import User, ApprovalLink
 from notifications.models import Notification
+from .brevo_service import send_email_via_brevo
 
 
 @receiver(post_save, sender=User)
@@ -23,26 +24,14 @@ def notify_admin_new_user_registration(sender, instance, created, **kwargs):
     - En producción usa transaction.on_commit + hilo para el email
     - En tests (email backend en memoria) ejecuta sincrónicamente
     """
-    print(f"[SIGNAL_DEBUG] ========== SIGNAL DISPARADO ==========")
-    print(f"[SIGNAL_DEBUG] Sender: {sender}")
-    print(f"[SIGNAL_DEBUG] Instance: {instance}")
-    print(f"[SIGNAL_DEBUG] Created: {created}")
-    print(f"[SIGNAL_DEBUG] User role: {getattr(instance, 'role', 'No role')}")
-    print(f"[SIGNAL_DEBUG] User is_verified: {getattr(instance, 'is_verified', 'No is_verified')}")
-    
     if not (created and instance.role == 'monitor'):
-        print(f"[SIGNAL_DEBUG] No es un monitor nuevo, saliendo...")
         return
 
     is_test_backend = settings.EMAIL_BACKEND == 'django.core.mail.backends.locmem.EmailBackend'
 
     def job():
-        print(f"[SIGNAL_DEBUG] ========== EJECUTANDO JOB ==========")
         # Obtener todos los administradores activos y verificados
         admin_users = User.objects.filter(role='admin', is_active=True, is_verified=True)
-        print(f"[SIGNAL_DEBUG] Admin users encontrados: {admin_users.count()}")
-        for admin in admin_users:
-            print(f"[SIGNAL_DEBUG] Admin: {admin.username} - {admin.email} - verified: {admin.is_verified}")
 
         # Crear notificación para cada admin
         for admin in admin_users:
@@ -68,18 +57,8 @@ def notify_admin_new_user_registration(sender, instance, created, **kwargs):
         reject_hash = hashlib.sha256(reject_token.encode()).hexdigest()
 
         # Guardar enlaces de aprobación/rechazo
-        print(f"[SIGNAL_DEBUG] ========== CREANDO ENLACES DE APROBACIÓN ==========")
-        print(f"[SIGNAL_DEBUG] Usuario: {instance.username}")
-        print(f"[SIGNAL_DEBUG] Approve token: {approve_token[:10]}...")
-        print(f"[SIGNAL_DEBUG] Reject token: {reject_token[:10]}...")
-        
-        approve_link = ApprovalLink.objects.create(user=instance, action=ApprovalLink.APPROVE, token_hash=approve_hash)
-        reject_link = ApprovalLink.objects.create(user=instance, action=ApprovalLink.REJECT, token_hash=reject_hash)
-        
-        print(f"[SIGNAL_DEBUG] Enlaces creados:")
-        print(f"[SIGNAL_DEBUG] - Approve: {approve_link.id} - {approve_link.action}")
-        print(f"[SIGNAL_DEBUG] - Reject: {reject_link.id} - {reject_link.action}")
-        print(f"[SIGNAL_DEBUG] Total enlaces para {instance.username}: {ApprovalLink.objects.filter(user=instance).count()}")
+        ApprovalLink.objects.create(user=instance, action=ApprovalLink.APPROVE, token_hash=approve_hash)
+        ApprovalLink.objects.create(user=instance, action=ApprovalLink.REJECT, token_hash=reject_hash)
 
         # Construir URLs absolutas
         base = getattr(settings, 'PUBLIC_BASE_URL', 'http://localhost:8000')
@@ -118,156 +97,87 @@ def notify_admin_new_user_registration(sender, instance, created, **kwargs):
 </html>
 """
 
-def _send():
-    try:
-        print(f"[BREVO_DEBUG] ========== INICIANDO ENVÍO CON BREVO ==========")
-        print(f"[BREVO_DEBUG] Timestamp: {__import__('datetime').datetime.now()}")
-        print(f"[BREVO_DEBUG] Admin emails: {admin_emails}")
-        print(f"[BREVO_DEBUG] From email: {settings.DEFAULT_FROM_EMAIL}")
-        print(f"[BREVO_DEBUG] Subject: {subject}")
-        print(f"[BREVO_DEBUG] Text content length: {len(texto)}")
-        print(f"[BREVO_DEBUG] HTML content length: {len(html)}")
-        
-        # Verificar configuración de Brevo
-        print(f"[BREVO_DEBUG] ========== CONFIGURACIÓN BREVO ==========")
-        print(f"[BREVO_DEBUG] EMAIL_BACKEND: {getattr(settings, 'EMAIL_BACKEND', 'No configurado')}")
-        print(f"[BREVO_DEBUG] BREVO_API_KEY: {'***' if getattr(settings, 'ANYMAIL', {}).get('BREVO_API_KEY') else 'No configurado'}")
-        print(f"[BREVO_DEBUG] DEFAULT_FROM_EMAIL: {settings.DEFAULT_FROM_EMAIL}")
-        
-        # Verificar variables de entorno
-        print(f"[BREVO_DEBUG] ========== VARIABLES DE ENTORNO ==========")
-        import os
-        print(f"[BREVO_DEBUG] DJANGO_ENV: {os.getenv('DJANGO_ENV', 'No configurado')}")
-        print(f"[BREVO_DEBUG] BREVO_API_KEY env: {'***' if os.getenv('BREVO_API_KEY') else 'No configurado'}")
-        print(f"[BREVO_DEBUG] DEFAULT_FROM_EMAIL env: {os.getenv('DEFAULT_FROM_EMAIL', 'No configurado')}")
-        
-        # Verificar configuración de Anymail
-        print(f"[BREVO_DEBUG] ========== CONFIGURACIÓN ANYMAIL ==========")
-        anymail_config = getattr(settings, 'ANYMAIL', {})
-        print(f"[BREVO_DEBUG] ANYMAIL config: {anymail_config}")
-        print(f"[BREVO_DEBUG] ANYMAIL BREVO_API_KEY: {'***' if anymail_config.get('BREVO_API_KEY') else 'No configurado'}")
-        
-        # Verificar que Anymail esté instalado
-        print(f"[BREVO_DEBUG] ========== VERIFICACIÓN ANYMAIL ==========")
-        try:
-            import anymail
-            print(f"[BREVO_DEBUG] Anymail version: {anymail.__version__}")
-            print(f"[BREVO_DEBUG] Anymail backends disponibles: {anymail.backends.__all__}")
-        except ImportError as import_error:
-            print(f"[BREVO_ERROR] Anymail no está instalado: {import_error}")
-            raise
-        
-        # Verificar backend específico
-        print(f"[BREVO_DEBUG] ========== VERIFICACIÓN BACKEND ==========")
-        try:
-            from anymail.backends.brevo import EmailBackend
-            print(f"[BREVO_DEBUG] Brevo EmailBackend importado correctamente")
-        except ImportError as backend_error:
-            print(f"[BREVO_ERROR] Error importando Brevo backend: {backend_error}")
-            raise
-        
-        # Usar send_mail con Brevo
-        print(f"[BREVO_DEBUG] ========== ENVIANDO EMAIL VIA BREVO ==========")
-        print(f"[BREVO_DEBUG] Usando Brevo API...")
-        print(f"[BREVO_DEBUG] Preparando send_mail con:")
-        print(f"[BREVO_DEBUG]   - subject: {subject}")
-        print(f"[BREVO_DEBUG]   - from_email: {settings.DEFAULT_FROM_EMAIL}")
-        print(f"[BREVO_DEBUG]   - recipient_list: {admin_emails}")
-        print(f"[BREVO_DEBUG]   - html_message length: {len(html)}")
-        print(f"[BREVO_DEBUG]   - fail_silently: False")
-        
-        # Log del contenido del email
-        print(f"[BREVO_DEBUG] ========== CONTENIDO DEL EMAIL ==========")
-        print(f"[BREVO_DEBUG] Subject: {subject}")
-        print(f"[BREVO_DEBUG] From: {settings.DEFAULT_FROM_EMAIL}")
-        print(f"[BREVO_DEBUG] To: {admin_emails}")
-        print(f"[BREVO_DEBUG] Text preview: {texto[:100]}...")
-        print(f"[BREVO_DEBUG] HTML preview: {html[:200]}...")
-        
-        # Intentar envío
-        print(f"[BREVO_DEBUG] ========== EJECUTANDO SEND_MAIL ==========")
-        result = send_mail(
-            subject=subject,
-            message=texto,
-            from_email=settings.DEFAULT_FROM_EMAIL,
-            recipient_list=admin_emails,
-            html_message=html,
-            fail_silently=False,
-        )
-        
-        print(f"[BREVO_DEBUG] ========== RESULTADO BREVO ==========")
-        print(f"[BREVO_DEBUG] Resultado send_mail: {result}")
-        print(f"[BREVO_DEBUG] Tipo de resultado: {type(result)}")
-        print(f"[BREVO_SUCCESS] Correo enviado via Brevo API a {len(admin_emails)} admins")
-        print(f"[BREVO_DEBUG] ========== EMAIL ENVIADO EXITOSAMENTE ==========")
-        
-    except Exception as e:
-        # Log explícito para depurar problemas de email
-        print(f"[BREVO_ERROR] ========== ERROR EN ENVÍO DE EMAIL ==========")
-        print(f"[BREVO_ERROR] Timestamp: {__import__('datetime').datetime.now()}")
-        print(f"[BREVO_ERROR] Error enviando correo a admins: {e}")
-        print(f"[BREVO_ERROR] Tipo de error: {type(e).__name__}")
-        print(f"[BREVO_ERROR] Módulo del error: {type(e).__module__}")
-        print(f"[BREVO_ERROR] Args del error: {e.args}")
-        
-        # Información adicional del error
-        print(f"[BREVO_ERROR] ========== INFORMACIÓN ADICIONAL DEL ERROR ==========")
-        try:
-            if hasattr(e, 'errno'):
-                print(f"[BREVO_ERROR] Error number: {e.errno}")
-            if hasattr(e, 'strerror'):
-                print(f"[BREVO_ERROR] Error string: {e.strerror}")
-            if hasattr(e, 'filename'):
-                print(f"[BREVO_ERROR] Error filename: {e.filename}")
-            if hasattr(e, 'response'):
-                print(f"[BREVO_ERROR] HTTP Response: {e.response}")
-            if hasattr(e, 'status_code'):
-                print(f"[BREVO_ERROR] HTTP Status Code: {e.status_code}")
-        except Exception as debug_error:
-            print(f"[BREVO_ERROR] Error obteniendo info adicional: {debug_error}")
-        
-        # Traceback completo
-        import traceback
-        print(f"[BREVO_ERROR] ========== TRACEBACK COMPLETO ==========")
-        print(f"[BREVO_ERROR] {traceback.format_exc()}")
-        print(f"[BREVO_ERROR] ========== FIN DEL ERROR ==========")
-        
-        # Información del sistema
-        print(f"[BREVO_ERROR] ========== INFORMACIÓN DEL SISTEMA ==========")
-        try:
-            import sys
-            print(f"[BREVO_ERROR] Python version: {sys.version}")
-            print(f"[BREVO_ERROR] Django version: {__import__('django').get_version()}")
-            print(f"[BREVO_ERROR] Anymail version: {__import__('anymail').__version__}")
-        except Exception as sys_error:
-            print(f"[BREVO_ERROR] Error obteniendo info del sistema: {sys_error}")
-        
-        # Re-raise para que el error se propague
-        raise
+        def _send():
+            try:
+                print(f"[EMAIL_DEBUG] ========== INICIANDO ENVÍO DE EMAIL ==========")
+                print(f"[EMAIL_DEBUG] Timestamp: {__import__('datetime').datetime.now()}")
+                print(f"[EMAIL_DEBUG] Admin emails: {admin_emails}")
+                print(f"[EMAIL_DEBUG] From email: {settings.DEFAULT_FROM_EMAIL}")
+                print(f"[EMAIL_DEBUG] Subject: {subject}")
+                print(f"[EMAIL_DEBUG] Text content length: {len(texto)}")
+                print(f"[EMAIL_DEBUG] HTML content length: {len(html)}")
+                
+                # Verificar configuración de email
+                print(f"[EMAIL_DEBUG] ========== CONFIGURACIÓN DE EMAIL ==========")
+                print(f"[EMAIL_DEBUG] EMAIL_BACKEND: {getattr(settings, 'EMAIL_BACKEND', 'No configurado')}")
+                print(f"[EMAIL_DEBUG] BREVO_API_KEY: {'***' if getattr(settings, 'BREVO_API_KEY', None) else 'No configurado'}")
+                print(f"[EMAIL_DEBUG] DEFAULT_FROM_EMAIL: {getattr(settings, 'DEFAULT_FROM_EMAIL', 'No configurado')}")
+                
+                # Verificar variables de entorno
+                print(f"[EMAIL_DEBUG] ========== VARIABLES DE ENTORNO ==========")
+                import os
+                print(f"[EMAIL_DEBUG] DJANGO_ENV: {os.getenv('DJANGO_ENV', 'No configurado')}")
+                print(f"[EMAIL_DEBUG] BREVO_API_KEY env: {'***' if os.getenv('BREVO_API_KEY') else 'No configurado'}")
+                
+                # Usar Brevo API
+                print(f"[EMAIL_DEBUG] ========== ENVIANDO EMAIL ==========")
+                print(f"[EMAIL_DEBUG] Usando Brevo API...")
+                
+                # Enviar a cada admin por separado
+                for admin_email in admin_emails:
+                    print(f"[EMAIL_DEBUG] Enviando a {admin_email}...")
+                    result = send_email_via_brevo(
+                        to=admin_email,
+                        subject=subject,
+                        html_content=html,
+                        text_content=texto
+                    )
+                    print(f"[EMAIL_DEBUG] Resultado Brevo para {admin_email}: {result}")
+                
+                print(f"[EMAIL_SUCCESS] Correo enviado via Brevo API a {len(admin_emails)} admins")
+                print(f"[EMAIL_DEBUG] ========== EMAIL ENVIADO EXITOSAMENTE ==========")
+                
+            except Exception as e:
+                # Log explícito para depurar problemas de email
+                print(f"[EMAIL_ERROR] ========== ERROR EN ENVÍO DE EMAIL ==========")
+                print(f"[EMAIL_ERROR] Timestamp: {__import__('datetime').datetime.now()}")
+                print(f"[EMAIL_ERROR] Error enviando correo a admins: {e}")
+                print(f"[EMAIL_ERROR] Tipo de error: {type(e).__name__}")
+                print(f"[EMAIL_ERROR] Módulo del error: {type(e).__module__}")
+                print(f"[EMAIL_ERROR] Args del error: {e.args}")
+                
+                import traceback
+                print(f"[EMAIL_ERROR] ========== TRACEBACK COMPLETO ==========")
+                print(f"[EMAIL_ERROR] {traceback.format_exc()}")
+                print(f"[EMAIL_ERROR] ========== FIN DEL ERROR ==========")
+                
+                # Intentar información adicional del error
+                try:
+                    if hasattr(e, 'errno'):
+                        print(f"[EMAIL_ERROR] Error number: {e.errno}")
+                    if hasattr(e, 'strerror'):
+                        print(f"[EMAIL_ERROR] Error string: {e.strerror}")
+                    if hasattr(e, 'filename'):
+                        print(f"[EMAIL_ERROR] Error filename: {e.filename}")
+                except Exception as debug_error:
+                    print(f"[EMAIL_ERROR] Error obteniendo info adicional: {debug_error}")
 
-    # En tests, ejecutar sincrónicamente para que mail.outbox funcione
-    # En producción, usar hilo asíncrono para no bloquear
-    is_testing = getattr(settings, 'TESTING', False) or 'test' in sys.argv
-    
-    print(f"[SIGNAL_DEBUG] ========== EJECUTANDO SIGNAL ==========")
-    print(f"[SIGNAL_DEBUG] is_testing: {is_testing}")
-    print(f"[SIGNAL_DEBUG] is_test_backend: {is_test_backend}")
-    print(f"[SIGNAL_DEBUG] EMAIL_BACKEND: {settings.EMAIL_BACKEND}")
-    
-    if is_testing or is_test_backend:
-        print(f"[SIGNAL_DEBUG] Ejecutando _send() síncronamente...")
-        _send()
-    else:
-        print(f"[SIGNAL_DEBUG] Ejecutando _send() en hilo asíncrono...")
-        threading.Thread(target=_send, daemon=True).start()
+        # En tests, ejecutar sincrónicamente para que mail.outbox funcione
+        # En producción, usar hilo asíncrono para no bloquear
+        is_testing = getattr(settings, 'TESTING', False) or 'test' in sys.argv
+        
+        if is_testing or is_test_backend:
+            _send()
+        else:
+            threading.Thread(target=_send, daemon=True).start()
 
-    if settings.EMAIL_BACKEND == 'django.core.mail.backends.console.EmailBackend':
-        print(f"\n{'='*60}")
-        print(f"ENLACES DE ACTIVACIÓN PARA: {instance.get_full_name()}")
-        print(f"{'='*60}")
-        print(f"APROBAR: {approve_url}")
-        print(f"RECHAZAR: {reject_url}")
-        print(f"{'='*60}\n")
+        if settings.EMAIL_BACKEND == 'django.core.mail.backends.console.EmailBackend':
+            print(f"\n{'='*60}")
+            print(f"ENLACES DE ACTIVACIÓN PARA: {instance.get_full_name()}")
+            print(f"{'='*60}")
+            print(f"APROBAR: {approve_url}")
+            print(f"RECHAZAR: {reject_url}")
+            print(f"{'='*60}\n")
 
     if is_test_backend:
         job()
