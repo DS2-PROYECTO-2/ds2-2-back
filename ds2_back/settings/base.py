@@ -36,6 +36,7 @@ INSTALLED_APPS = [
     'attendance',
     'schedule',
     'reports',
+    'export',
     'courses',
 ]
 

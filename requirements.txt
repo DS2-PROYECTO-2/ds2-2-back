@@ -48,3 +48,8 @@ crispy-bootstrap4==2022.1
 # Additional Django packages
 django-filter==23.5  # Filtering support
 django-import-export==3.3.1  # Data import/export
+
+# Export functionality
+reportlab==4.0.9  # PDF generation
+openpyxl==3.1.2  # Excel file handling
+xlsxwriter==3.1.9  # Advanced Excel formatting
