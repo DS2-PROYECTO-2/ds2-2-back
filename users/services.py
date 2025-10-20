@@ -1,5 +1,6 @@
 from django.core.mail import send_mail
 from django.conf import settings
+from .email_utils import send_email_unified
 
 def send_password_reset_email(user, reset_url: str) -> str:
     """
@@ -32,13 +33,11 @@ def send_password_reset_email(user, reset_url: str) -> str:
   </body>
 </html>
 """
-    send_mail(
+    send_email_unified(
+        to=user.email,
         subject=subject,
-        message=text,
-        from_email=settings.DEFAULT_FROM_EMAIL,
-        recipient_list=[user.email],
-        html_message=html,
-        fail_silently=False,
+        text_content=text,
+        html_content=html
     )
     
     # En desarrollo, devolver el enlace para mostrar en consola

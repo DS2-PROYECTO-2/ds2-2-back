@@ -6,6 +6,7 @@ from .models import EquipmentReport
 from notifications.services import NotificationService
 from notifications.models import Notification
 from users.models import User
+from users.email_utils import send_email_unified
 import logging
 
 logger = logging.getLogger(__name__)
@@ -170,13 +171,11 @@ def send_equipment_report_email(admin, equipment_report):
 </html>
 """
         
-        send_mail(
+        send_email_unified(
+            to=admin.email,
             subject=subject,
-            message=text_message,
-            from_email=settings.DEFAULT_FROM_EMAIL,
-            recipient_list=[admin.email],
-            html_message=html_message,
-            fail_silently=True,
+            text_content=text_message,
+            html_content=html_message
         )
         
         logger.info(f"Email de reporte de equipo enviado a {admin.email}")

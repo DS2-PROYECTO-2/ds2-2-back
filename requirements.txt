@@ -6,8 +6,9 @@ Django==4.2.16
 djangorestframework==3.14.0
 
 # Database
-psycopg2-binary==2.9.9  # PostgreSQL adapter
-dj-database-url==3.0.1  # Database URL parser
+psycopg==3.2.3  # PostgreSQL adapter moderno (compatible Python 3.13)
+psycopg2-binary==2.9.9  # Fallback para compatibilidad
+dj-database-url==3.0.1  # Database URL parser para Render
 django-cors-headers==4.3.1  # CORS handling
 
 # Authentication & Security
@@ -28,8 +29,9 @@ django-extensions==3.2.3  # Extended management commands
 
 # Utilities
 python-decouple==3.8  # Environment variables
+django-environ==0.11.2  # Environment variables parser
 pytz==2023.3  # Timezone handling
-Pillow==10.1.0  # Image processing
+Pillow==10.4.0  # Image processing (compatible con Python 3.13)
 
 # Production
 gunicorn==21.2.0  # WSGI server
@@ -37,6 +39,7 @@ whitenoise==6.6.0  # Static files serving
 
 # Email
 django-anymail==10.2  # Email backend
+requests==2.31.0  # Para Resend API HTTP
 
 # Validation & Forms
 django-crispy-forms==2.1  # Better forms
