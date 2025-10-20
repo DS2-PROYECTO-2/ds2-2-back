@@ -1,11 +1,13 @@
-name: CI (Tests Only)
+name: CI/CD Pipeline
 
 on:
+  push:
+    branches: [ main, develop ]
   pull_request:
     branches: [ main, develop ]
 
 jobs:
-  build-test:
+  test:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     strategy:
@@ -59,3 +61,29 @@ jobs:
           DJANGO_SETTINGS_MODULE: ds2_back.settings
         run: |
           python manage.py test --verbosity 1 --keepdb
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Deploy to Render
+        uses: johnbeynon/render-deploy-action@v0.0.8
+        with:
+          service-id: ${{ secrets.RENDER_SERVICE_ID }}
+          api-key: ${{ secrets.RENDER_API_KEY }}
+          wait-for-success: true
+          timeout: 600
+
+      - name: Notify deployment success
+        run: |
+          echo "✅ Deployment successful!"
+          echo "🚀 Service deployed to: ${{ secrets.RENDER_SERVICE_URL }}"
+          echo "📅 Deployed at: $(date)"
+          echo "🔗 Branch: ${{ github.ref_name }}"
+          echo "📝 Commit: ${{ github.sha }}"
