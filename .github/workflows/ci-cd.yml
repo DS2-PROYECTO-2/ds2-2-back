@@ -34,15 +34,8 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          echo "Installing Django and dependencies..."
-          pip install --no-cache-dir "Django>=4.2,<5.0"
-          pip install --no-cache-dir "djangorestframework==3.14.0"
-          pip install --no-cache-dir "django-cors-headers==4.9.0"
-          pip install --no-cache-dir "Pillow==10.4.0"
-          pip install --no-cache-dir "python-decouple==3.8"
-          pip install --no-cache-dir "django-environ==0.11.2"
-          pip install --no-cache-dir "requests>=2.25.0"
-          pip install --no-cache-dir "psycopg2-binary>=2.9.0"
+          echo "Installing dependencies from requirements.txt..."
+          pip install --no-cache-dir -r requirements.txt
           echo "Verifying installation..."
           pip list
           python -c "import django; print(f'Django version: {django.get_version()}')"
