@@ -1,0 +1,33 @@
+name: Deploy
+
+on:
+  push:
+    branches: [ main, develop ]
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    branches: [ main, develop ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'push' }}
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Deploy to Render
+        uses: johnbeynon/render-deploy-action@v0.0.8
+        with:
+          service-id: ${{ secrets.RENDER_SERVICE_ID }}
+          api-key: ${{ secrets.RENDER_API_KEY }}
+          wait-for-success: true
+          timeout: 600
+
+      - name: Health Check
+        run: |
+          echo "Waiting for deployment to be ready..."
+          sleep 30
+          curl -f ${{ secrets.RENDER_SERVICE_URL }}/health/ || echo "Health check endpoint not available"
