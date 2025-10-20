@@ -11,6 +11,12 @@ class Attendance(models.Model):
         verbose_name="Título",
         help_text='Título descriptivo del listado de asistencia'
     )
+    room = models.ForeignKey(
+        'rooms.Room',
+        on_delete=models.CASCADE,
+        verbose_name="Sala",
+        help_text='Sala a la que corresponde el listado de asistencia'
+    )
     date = models.DateField(
         verbose_name="Fecha",
         help_text='Fecha a la que corresponde el listado de asistencia'

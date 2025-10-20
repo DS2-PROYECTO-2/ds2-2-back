@@ -10,6 +10,22 @@ from .serializers import AttendanceSerializer, IncapacitySerializer
 User = get_user_model()
 
 
+class IsMonitorOrAdmin(permissions.BasePermission):
+    """
+    Permiso personalizado para monitores y administradores
+    """
+    def has_permission(self, request, view):
+        return request.user.is_authenticated and request.user.role in ['monitor', 'admin']
+
+
+class IsAdminUser(permissions.BasePermission):
+    """
+    Permiso personalizado solo para administradores
+    """
+    def has_permission(self, request, view):
+        return request.user.is_authenticated and request.user.role == 'admin'
+
+
 class AttendanceViewSet(viewsets.ModelViewSet):
     """
     API endpoint para gestionar listados de asistencia
@@ -23,8 +39,26 @@ class AttendanceViewSet(viewsets.ModelViewSet):
         """
         if self.action in ['mark_as_reviewed']:
             # Solo admins pueden marcar como revisado
-            return [permissions.IsAuthenticated() and permissions.IsAdminUser()]
-        return [permissions.IsAuthenticated()]
+            return [IsAdminUser()]
+        elif self.action in ['create']:
+            # Solo monitores y admins pueden crear
+            return [IsMonitorOrAdmin()]
+        elif self.action in ['list', 'retrieve', 'download']:
+            # Admins pueden ver todo, monitores solo sus uploads
+            return [permissions.IsAuthenticated()]
+        else:
+            return [IsMonitorOrAdmin()]
+    
+    def get_queryset(self):
+        """
+        Filtrar queryset según el rol del usuario
+        """
+        if self.request.user.role == 'admin':
+            # Admins pueden ver todos los listados
+            return Attendance.objects.all().order_by('-date')
+        else:
+            # Monitores solo pueden ver sus propios uploads
+            return Attendance.objects.filter(uploaded_by=self.request.user).order_by('-date')
     
     def perform_create(self, serializer):
         """Asignar automáticamente el usuario actual como uploaded_by"""

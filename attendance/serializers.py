@@ -8,17 +8,27 @@ class AttendanceSerializer(serializers.ModelSerializer):
     """
     uploaded_by_username = serializers.ReadOnlyField(source='uploaded_by.username')
     reviewed_by_username = serializers.ReadOnlyField(source='reviewed_by.username', read_only=True)
+    room_name = serializers.ReadOnlyField(source='room.name')
+    room_code = serializers.ReadOnlyField(source='room.code')
     
     class Meta:
         model = Attendance
-        fields = ['id', 'title', 'date', 'uploaded_by', 'uploaded_by_username', 'file', 'description',
-                  'reviewed', 'reviewed_by', 'reviewed_by_username', 'created_at', 'updated_at']
+        fields = ['id', 'title', 'room', 'room_name', 'room_code', 'date', 'uploaded_by', 'uploaded_by_username', 
+                  'file', 'description', 'reviewed', 'reviewed_by', 'reviewed_by_username', 'created_at', 'updated_at']
         read_only_fields = ['id', 'uploaded_by', 'reviewed', 'reviewed_by', 'created_at', 'updated_at']
     
     def create(self, validated_data):
         """Asignar automáticamente el usuario actual como uploaded_by"""
         validated_data['uploaded_by'] = self.context['request'].user
         return super().create(validated_data)
+    
+    def validate(self, data):
+        """Validación personalizada"""
+        if not data.get('file'):
+            raise serializers.ValidationError("El archivo es requerido.")
+        if not data.get('room'):
+            raise serializers.ValidationError("La sala es requerida.")
+        return data
 
 
 class IncapacitySerializer(serializers.ModelSerializer):
