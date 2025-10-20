@@ -49,6 +49,17 @@ DEFAULT_FROM_EMAIL = env('DEFAULT_FROM_EMAIL', default='Soporte DS2 <sado56hdgm@
 # Brevo API Key (requerido)
 BREVO_API_KEY = env('BREVO_API_KEY', default='')
 
+# Configuración de email para producción (sin Gmail)
+EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'  # Solo para logs en producción
+EMAIL_HOST = 'smtp.brevo.com'
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+EMAIL_USE_SSL = False
+EMAIL_HOST_USER = env('EMAIL_HOST_USER', default='')  # No requerido en producción
+EMAIL_HOST_PASSWORD = env('EMAIL_HOST_PASSWORD', default='')  # No requerido en producción
+EMAIL_TIMEOUT = 20
+EMAIL_FAIL_SILENTLY = True  # No fallar si no hay configuración de email
+
 # URLs para producción
 PUBLIC_BASE_URL = env('PUBLIC_BASE_URL')
 FRONTEND_BASE_URL = env('FRONTEND_BASE_URL')
