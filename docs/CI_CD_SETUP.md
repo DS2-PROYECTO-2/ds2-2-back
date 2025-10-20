@@ -38,8 +38,8 @@ RENDER_SERVICE_URL=https://tu-servicio.onrender.com
 
 ### 1. CI/CD Completo (`ci-cd.yml`)
 - Ejecuta tests automáticamente
-- Despliega automáticamente solo en push a main/develop
-- No se ejecuta en pull requests (solo tests)
+- Despliega automáticamente en push a main/develop Y en pull requests
+- Permite probar el despliegue antes de hacer merge
 
 ### 2. CI Separado (`ci.yml`)
 - Solo ejecuta tests
@@ -51,7 +51,7 @@ RENDER_SERVICE_URL=https://tu-servicio.onrender.com
 
 ## Flujo de Trabajo
 
-1. **Pull Request**: Solo ejecuta tests (CI)
+1. **Pull Request**: Ejecuta tests + despliegue automático (CI/CD)
 2. **Push a main/develop**: Ejecuta tests + despliegue automático (CI/CD)
 
 ## Monitoreo
