@@ -11,24 +11,24 @@ services:
         value: false
       - key: SECRET_KEY
         generateValue: true
+      - key: DATABASE_URL
+        fromDatabase:
+          name: ds2-database
+          property: connectionString
       - key: ALLOWED_HOSTS
-        value: "your-app-name.onrender.com,yourdomain.com"
+        value: "backendpruebas-r4zu.onrender.com"
       - key: CORS_ALLOWED_ORIGINS
-        value: "https://your-frontend.onrender.com"
+        value: "https://ds2-2-front.vercel.app"
       - key: CSRF_TRUSTED_ORIGINS
-        value: "https://your-app-name.onrender.com"
+        value: "https://backendpruebas-r4zu.onrender.com"
       - key: PUBLIC_BASE_URL
-        value: "https://your-app-name.onrender.com"
+        value: "https://backendpruebas-r4zu.onrender.com"
       - key: FRONTEND_BASE_URL
-        value: "https://your-frontend.onrender.com"
-      - key: EMAIL_HOST_USER
-        value: "your-email@gmail.com"
-      - key: EMAIL_HOST_PASSWORD
-        value: "your-app-password"
+        value: "https://ds2-2-front.vercel.app"
       - key: DEFAULT_FROM_EMAIL
-        value: "Your App <your-email@gmail.com>"
+        value: "Soporte DS2 <sado56hdgm@gmail.com>"
 
 databases:
-  - name: ds2-postgres
+  - name: ds2-database
     databaseName: ds2_back_db
     user: ds2_user

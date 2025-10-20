@@ -8,7 +8,16 @@ ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=['*'])
 
 # Base de datos desde DATABASE_URL (Render)
 DATABASES = {
-    'default': dj_database_url.parse(env('DATABASE_URL'))
+    'default': dj_database_url.parse(
+        env('DATABASE_URL'),
+        conn_max_age=600,
+        conn_health_checks=True,
+    )
+}
+
+# Configuración SSL para PostgreSQL en Render
+DATABASES['default']['OPTIONS'] = {
+    'sslmode': 'require',
 }
 
 # Security settings
@@ -34,14 +43,11 @@ CSRF_TRUSTED_ORIGINS = env.list('CSRF_TRUSTED_ORIGINS', default=[])
 DISABLE_CSRF_FOR_API = env.bool('DISABLE_CSRF_FOR_API', default=False)
 
 
-# Email para producción
-EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-EMAIL_HOST = env('EMAIL_HOST', default='smtp.gmail.com')
-EMAIL_PORT = env.int('EMAIL_PORT', default=587)
-EMAIL_USE_TLS = env.bool('EMAIL_USE_TLS', default=True)
-EMAIL_HOST_USER = env('EMAIL_HOST_USER')
-EMAIL_HOST_PASSWORD = env('EMAIL_HOST_PASSWORD')
-DEFAULT_FROM_EMAIL = env('DEFAULT_FROM_EMAIL')
+# Email para producción - Solo Brevo API
+DEFAULT_FROM_EMAIL = env('DEFAULT_FROM_EMAIL', default='Soporte DS2 <sado56hdgm@gmail.com>')
+
+# Brevo API Key (requerido)
+BREVO_API_KEY = env('BREVO_API_KEY', default='')
 
 # URLs para producción
 PUBLIC_BASE_URL = env('PUBLIC_BASE_URL')
